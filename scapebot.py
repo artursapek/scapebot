@@ -31,7 +31,7 @@ class scapebot():
 						entry = br.follow_link(text=link.renderContents(), nr=0).read()
 						found = True
 					except:
-						print 'Error opening link'
+						break
 		if found == False:	
 			show = 'No show on that day'
 		else:
@@ -48,11 +48,11 @@ class scapebot():
 					for b in font('b'):
 						if '$' in b.renderContents():
 							extra = b.renderContents()
-							theindex = extra.index('$')
-							price = extra[theindex : len(extra)]
+							time = extra[0 : extra.index(' ')]
+							price = extra[extra.index('$') : len(extra)]
 			show.append(bands)
 			show.append('%s %s' % (month, day[0:3]))
+			show.append(time)
 			show.append(price)
 		print show
 		self.command()
-
