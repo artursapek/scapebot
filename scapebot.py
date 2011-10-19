@@ -9,14 +9,9 @@ months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'Augus
 
 class scapebot():
 
-
 	def command(self):
 		userinput = raw_input('> ')
 		self.Comet_Tavern(userinput)
-
-
-
-
 	
 	def Comet_Tavern(self, date):
 		br = Browser()
@@ -60,8 +55,4 @@ class scapebot():
 			show.append(price)
 		print show
 		self.command()
-			
-		
-
-
 
