@@ -55,7 +55,6 @@ class scapebot():
 							extra = b.renderContents()
 							theindex = extra.index('$')
 							price = extra[theindex : len(extra)]
-							print price
 			show.append(bands)
 			show.append('%s %s' % (month, day[0:3]))
 			show.append(price)
