@@ -22,7 +22,7 @@ class scapebot():
 		br['month'] = [month]
 		results = br.submit(name='submit').read()
 		soup = BeautifulSoup(results)
-		showLink = show = []
+		show = []
 		found = False
 		for main in soup(id='main'):
 			for link in main('a'):
