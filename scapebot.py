@@ -9,7 +9,7 @@ months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'Augus
 
 class scapebot():
 
-	def command(self):
+	def command(self):    # Right now this only searches Comet Tavern
 		userinput = raw_input('> ')
 		self.Comet_Tavern(userinput)
 	
@@ -56,3 +56,28 @@ class scapebot():
 			show.append(price)
 		print show
 		self.command()
+
+
+	def email(self, To, Subject, Body):    # For emailing critical errors / progress reports
+	
+		import smtplib
+		from email.MIMEMultipart import MIMEMultipart
+		from email.MIMEText import MIMEText
+		from email.MIMEBase import MIMEBase
+		from email.Utils import COMMASPACE, formatdate
+		To = [To]
+		assert type(To) == list
+		Msg = MIMEMultipart()
+		Msg['From'] ='Scapebot'
+		Msg['To'] = COMMASPACE.join(To)
+		Msg['Subject'] = Subject
+		Msg.attach(MIMEText(Body))
+
+		server = smtplib.SMTP('smtp.gmail.com', '587')
+		server.ehlo()
+		server.starttls()
+		server.ehlo()
+		server.login('artur.sapek', 'chaney15adick')
+		server.sendmail('Scapebot', To, Msg.as_string())
+		server.quit()
+
