@@ -66,9 +66,10 @@ class scapebot():
 		from email.MIMEBase import MIMEBase
 		from email.Utils import COMMASPACE, formatdate
 		To = [To]
+		From = 'scapebot <artur.sapek@gmail.com>'
 		assert type(To) == list
 		Msg = MIMEMultipart()
-		Msg['From'] ='Scapebot'
+		Msg['From'] = From
 		Msg['To'] = COMMASPACE.join(To)
 		Msg['Subject'] = Subject
 		Msg.attach(MIMEText(Body))
@@ -78,6 +79,6 @@ class scapebot():
 		server.starttls()
 		server.ehlo()
 		server.login('artur.sapek', 'chaney15adick')
-		server.sendmail('Scapebot', To, Msg.as_string())
+		server.sendmail(From, To, Msg.as_string())
 		server.quit()
 
