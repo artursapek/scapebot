@@ -82,20 +82,18 @@ class scapebot():
 		server.sendmail(From, To, Msg.as_string())
 		server.quit()
 
-	def twitter(self, action):
+	def twitter(self, action):    # Fun shit
 		br = Browser()
-		br.set_handle_robots(False)
+		br.set_handle_robots(False) # not spamming or abusing twitter, just using it creatively :)
 		br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]		
-		print br.open('https://mobile.twitter.com/session/new').read()
-		# get thru captcha
-
-
-
+		br.open('https://mobile.twitter.com/session/new')
 		br.select_form(nr=0)
-		print br.form.controls
 		br.form['username'] = 'scapebot'
 		br.form['password'] = 'kimmck'
-		print br.submit().read()
+		br.submit()
+		
+		#logged in
+
 		if action[0] == "tweet":
 			br.select_form(nr=0)			
 			br['tweet[text]'] = action[1]
