@@ -84,8 +84,7 @@ class scapebot():
 
 	def twitter(self, action):    # Fun shit
 		br = Browser()
-		password = open('twitterpassword.txt').readline()
-		print password
+		password = open('twitterpassword.txt').readline()[0:9]
 		br.set_handle_robots(False) # not spamming or abusing twitter, just using it creatively :)
 		br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]		
 		br.open('https://mobile.twitter.com/session/new')
