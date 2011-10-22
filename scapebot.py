@@ -89,7 +89,7 @@ class scapebot():
 		br.open('https://mobile.twitter.com/session/new')
 		br.select_form(nr=0)
 		br.form['username'] = 'scapebot'
-		br.form['password'] = 'kimmck'
+		br.form['password'] = 'dubaSNL'
 		br.submit()
 		
 		#logged in
@@ -98,3 +98,22 @@ class scapebot():
 			br.select_form(nr=0)			
 			br['tweet[text]'] = action[1]
 			br.submit()
+
+		if action[0] == "search":
+			isSearchForm = lambda l: l.action == 'http://mobile.twitter.com/searches'
+			br.select_form(predicate=isSearchForm)
+			br['search[query]'] = action[1]
+			results = br.submit().read()
+			soup = BeautifulSoup(results)
+			tweets = soup.findAll('div', attrs={'class' : 'list-tweet'} )
+			for tweet in tweets:
+				sender = tweet.find('strong').a.renderContents()
+				message = tweet.find('span', attrs={ 'class' : 'status' } ).renderContents()
+				message_soup = BeautifulSoup(message)
+				for tag in message_soup.findAll(True):
+					if tag.name == 'a':
+						hashtag = '%s' % tag.renderContents()
+						tag.replaceWith(hashtag)
+				message = message_soup
+				tweetContents = '@%s %s' % (sender, message)
+				print tweetContents
