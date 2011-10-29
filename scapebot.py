@@ -5,10 +5,9 @@
 
 
 
-from BeautifulSoup import BeautifulSoup
+from BeautifulSoup import BeautifulSoup, SoupStrainer
 from mechanize import Browser
-import csv
-import linecache
+import csv, string
 
 
 class scapebot():
@@ -19,7 +18,10 @@ class scapebot():
 		global monthsabbr 
 		monthsabbr = ['Jan', 'Feb', 'Mar', 'April', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-
+	def sanitize(self, x): #clean up names which are often not spelled consistently
+		for i in range(1, 32):
+			x = ''.join(x.split(str(string.punctuation)[i]))
+		return x
 		
 
 	def command(self):    # Commandline interpreter
@@ -52,7 +54,189 @@ class scapebot():
 
 
 
+	# dealing with a band: checking to see if they exist in the db, if not researching and add them to the db
 
+	# these functions will be used several times per show when scraping shows:
+
+
+	def checkBand(self, bandname): # checks if a band exists in the db, if not this will redirect to research band
+		file = open('bands.csv', 'rb')
+		ID = int(len(file.readlines()))
+		file.seek(0)
+		reader = csv.reader(file)
+		bandfound = False
+		for row in reader:
+			if row[1] == bandname:
+				bandfound = True
+				return row[0]
+				break
+		if not bandfound:
+			file.close()
+			file = open('bands.csv', 'a')
+			writer = csv.writer(file)
+			writer.writerow((ID, bandname))
+			file.close()
+			return ID
+
+	def getBand(self, ID):
+		file = open('bands.csv', 'rb')
+		reader = csv.reader(file)
+		rownum = -1
+		bandfound = False
+		for row in reader:
+			rownum += 1
+			if rownum == ID:
+				return row
+				bandfound = True
+				break
+		if not bandfound:
+			return 'No band with that ID'
+	
+	def researchBand(self, bandname): # will research band if a new entry is required (which will be more often than not for a long time)
+		#first things first: Google them.
+		br = Browser()
+		br.set_handle_robots(False)
+		br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]						
+		br.open('http://google.com')
+		br.select_form(nr=0)
+		query = '%s' % bandname
+		if len(bandname) / len(bandname.split()) <= 3:
+			query = '"%s"' % bandname
+		else:
+			query = '%s music' % bandname
+		br['q'] = query
+		soup = BeautifulSoup(br.submit().read())
+		results = soup.findAll('ol', attrs={'id': 'rso'})[0]
+		sources = {}
+		for li in results('li'):
+			try:
+				for em in li(['em', 'b']):
+					em.replaceWith(em.renderContents())
+				#print li.div.h3.a.renderContents(), li.div.h3.a['href']
+
+				
+				link = li.div.h3.a
+				#print link.renderContents()
+				#knownSources = {'Wikipedia': 'wikipedia.org', 'Last.fm': 'last.fm/music', 'Facebook': 'facebook.com', 'Bandcamp': 'bandcamp.com', 'Myspace': 'myspace.com', 'Soundcloud': 'soundcloud.com'}
+				knownSources = {'Wikipedia': 'wikipedia.org'}
+				for entry in knownSources:
+					try:
+						temp = link['href'].index(knownSources[entry])
+						#so it doesn't redefine entries with lower results:
+						if entry in sources:
+							break
+						try:
+							#print '.', knownSources[entry], self.sanitize(bandname) 
+							#print link['href']
+							
+							br = Browser()
+							br.set_handle_robots(False)
+							br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]	
+							temp = self.sanitize(str(BeautifulSoup(br.open(link['href']).read())).lower()).index(self.sanitize(bandname).lower())
+							try:
+								sources[entry] = str(link['href'][:link['href'].index('?')])
+							except:
+								sources[entry] = str(link['href'])								
+						except:
+							break
+					except:
+						pass
+			except:
+				pass
+
+
+		print sources
+		
+		INFO = [bandname,'','','']
+		# need to append genre, origin, and album cover
+
+			
+		if 'Wikipedia' in sources:
+			#scrape wikipedia
+			wikiINFO = {}
+			wiki_browser = Browser()
+			soup = BeautifulSoup(br.open(sources['Wikipedia']).read())
+			try:
+				originInfo = soup.findAll('th', text='Origin')[0].parent.parent.td
+				for link in originInfo('a'):
+					link.replaceWith(link.renderContents())
+				for citation in originInfo('sup'):
+					citation.replaceWith('')
+				for linebreak in originInfo('br'):
+					linebreak.replaceWith('')
+				
+
+				origin = originInfo.renderContents()
+
+				
+
+				wikiINFO['Origin'] = origin
+
+			except:
+				origin = False
+			# origin done, now do same for Genres
+			try:
+				
+				genreInfo = soup.findAll('th', text='Genres')[0].parent.parent.parent.td
+				
+				#print genreInfo
+
+				for link in genreInfo('a'):
+					link.replaceWith(link.renderContents())
+				for citation in genreInfo('sup'):
+					citation.replaceWith('')
+				for linebreak in genreInfo('br'):
+					linebreak.replaceWith('')
+				genres = genreInfo.renderContents()
+
+				wikiINFO['Genre'] = genres	
+				
+			except:
+				pass
+			# genres done
+
+
+
+			
+
+
+
+		
+		if 'Myspace' in sources:
+			pass
+			
+			
+
+
+		
+		if 'Last.fm' in sources:
+			#scrape last.fm
+			pass
+		if 'Bandscamp' in sources:
+			#scrape bandcamp
+			pass
+
+		if 'Soundcloud' in sources:
+			#scrape soundcloud
+			pass
+
+
+
+	
+		# combine the info collected from all sources
+		
+		positions = {'Genre':1,'Origin':2,'Albumsrc':3}
+		
+		
+
+		try:
+			for entry in wikiINFO:
+				INFO[positions[entry]] = wikiINFO[entry]
+		except:
+			pass
+		return INFO
+
+		
 # scraping functions
 # format: [ showID, venueID, Date, Time, Price, 21+, Bands ]
 
