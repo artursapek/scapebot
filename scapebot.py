@@ -7,7 +7,12 @@
 
 from BeautifulSoup import BeautifulSoup, SoupStrainer
 from mechanize import Browser
-import csv, string
+from collections import defaultdict
+import csv
+import string
+import re
+
+
 
 
 class scapebot():
@@ -59,6 +64,8 @@ class scapebot():
 	# these functions will be used several times per show when scraping shows:
 
 
+	# hangs up on Facebook pages
+
 	def checkBand(self, bandname): # checks if a band exists in the db, if not this will redirect to research band
 		file = open('bands.csv', 'rb')
 		ID = int(len(file.readlines()))
@@ -93,32 +100,57 @@ class scapebot():
 			return 'No band with that ID'
 	
 	def researchBand(self, bandname): # will research band if a new entry is required (which will be more often than not for a long time)
-		#first things first: Google them.
+		# set some quality-assurance variables :) <3
+		nameFormatted = False
+		GENRES = []
+
+		
+		# OKAY. first things first: Google them.
 		br = Browser()
 		br.set_handle_robots(False)
 		br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]						
 		br.open('http://google.com')
+
 		br.select_form(nr=0)
 		query = '%s' % bandname
 		if len(bandname) / len(bandname.split()) <= 3:
 			query = '"%s"' % bandname
+			wuLyfCoefficient = False
 		else:
-			query = '%s music' % bandname
+			query = '%s' % bandname
+			wuLyfCoefficient = True
 		br['q'] = query
 		soup = BeautifulSoup(br.submit().read())
 		results = soup.findAll('ol', attrs={'id': 'rso'})[0]
 		sources = {}
+		try:
+			suggestion = soup.findAll('p', attrs={ 'class' : 'sp_cnt' })[0].a
+			for i in suggestion('i'):
+				i.replaceWith(i.renderContents())
+			for b in suggestion('b'):
+				b.replaceWith(b.renderContents())
+			suggestion = suggestion.renderContents().replace('"', '').replace('- ', '-').replace('&quot', '').replace(';', '')
+			bandname = suggestion
+			if wuLyfCoefficient:
+				bandname = bandname[:bandname.find(' music')]
+			print bandname, ' < suggested'
+		except:
+			pass
+		
+
+		
+
+
 		for li in results('li'):
 			try:
 				for em in li(['em', 'b']):
 					em.replaceWith(em.renderContents())
 				#print li.div.h3.a.renderContents(), li.div.h3.a['href']
 
-				
+				#print li.a.renderContents() 
 				link = li.div.h3.a
 				#print link.renderContents()
-				#knownSources = {'Wikipedia': 'wikipedia.org', 'Last.fm': 'last.fm/music', 'Facebook': 'facebook.com', 'Bandcamp': 'bandcamp.com', 'Myspace': 'myspace.com', 'Soundcloud': 'soundcloud.com'}
-				knownSources = {'Wikipedia': 'wikipedia.org'}
+				knownSources = {'Wikipedia': 'wikipedia.org', 'Last.fm': 'last.fm/music', 'Facebook': 'facebook.com', 'Bandcamp': 'bandcamp.com', 'Myspace': 'myspace.com', 'Soundcloud': 'soundcloud.com'}
 				for entry in knownSources:
 					try:
 						temp = link['href'].index(knownSources[entry])
@@ -132,11 +164,17 @@ class scapebot():
 							br = Browser()
 							br.set_handle_robots(False)
 							br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]	
-							temp = self.sanitize(str(BeautifulSoup(br.open(link['href']).read())).lower()).index(self.sanitize(bandname).lower())
-							try:
-								sources[entry] = str(link['href'][:link['href'].index('?')])
-							except:
-								sources[entry] = str(link['href'])								
+							if re.search(bandname.replace(' ', '[ -]'), str(BeautifulSoup(br.open(link['href']).read())), flags=re.I):
+								try:
+									URL = str(link['href'][:link['href'].index('?')])
+									sources[entry] = URL
+								except:
+									URL = str(link['href'])
+									sources[entry] = URL
+							if entry == 'Last.fm': # make sure to go to the artist's root page and not videos or something
+								m = re.match('http://www.last.fm/music/[^/]*', sources[entry])
+								if m:
+									sources[entry] = m.group(0)
 						except:
 							break
 					except:
@@ -146,20 +184,27 @@ class scapebot():
 
 
 		print sources
-		
-		INFO = [bandname,'','','']
+	
 		# need to append genre, origin, and album cover
 
 			
 		if 'Wikipedia' in sources:
 			#scrape wikipedia
 			wikiINFO = {}
-			wiki_browser = Browser()
 			soup = BeautifulSoup(br.open(sources['Wikipedia']).read())
+			print 'wiki'
+
 			try:
+				#redefine bandname with formatting from wiki header, band names can be weird, number 1 trusted source for name formatting
+
+				bandname = soup.h1.renderContents().replace(' (musician)', '').replace(' (band)', '')			
+				nameFormatted = True # name formatting done, that was easy :)
+				print 'title changed from wikipedia'
 				originInfo = soup.findAll('th', text='Origin')[0].parent.parent.td
 				for link in originInfo('a'):
 					link.replaceWith(link.renderContents())
+				for span in originInfo('span'):
+					span.replaceWith(span.renderContents())
 				for citation in originInfo('sup'):
 					citation.replaceWith('')
 				for linebreak in originInfo('br'):
@@ -173,7 +218,7 @@ class scapebot():
 				wikiINFO['Origin'] = origin
 
 			except:
-				origin = False
+				pass
 			# origin done, now do same for Genres
 			try:
 				
@@ -187,9 +232,23 @@ class scapebot():
 					citation.replaceWith('')
 				for linebreak in genreInfo('br'):
 					linebreak.replaceWith('')
-				genres = genreInfo.renderContents()
+				genres = genreInfo.renderContents().split(', ')
+				
+
+				
+				# dealing with newlines:
+
+				if genres[0].find('\n') > -1 and len(genres) == 1:
+					genres = re.sub('\n', ', ', genres[0]).split(', ')
+
+					
+				genres = self.cleanGenres(genres, bandname)
 
 				wikiINFO['Genre'] = genres	
+				
+				GENRES += genres
+
+				print 'WIKI genres', genres
 				
 			except:
 				pass
@@ -197,46 +256,196 @@ class scapebot():
 
 
 
+		if 'Last.fm' in sources:
 			
 
+			try:
+				#scrape last.fm
+				lastfmINFO = {}
+				soup = BeautifulSoup(br.open(sources['Last.fm']).read())
+				print 'last.fm'
+				
+				try:
+					soup = str(soup)
+					genreMeta = soup.index('itemprop="keywords"') # this is a hack, cos for some reason BeauSoup doesnt find itemprop attrs
+					genres = soup[genreMeta + 29:]
+					genres = genres[:genres.index('">')]
+					genres = genres.split(', ')
+					if not nameFormatted:
+						nameMeta = soup.index('itemprop="name"')
+						bandname = soup[nameMeta + 16:]
+						bandname = bandname[:bandname.index('</h1>')]
+						print 'name reformatted from last.fm'
+						nameFormatted = True
+						
+					# sometimes last.fm will have a band/musician's own name as a tag
+					genres = self.cleanGenres(genres, bandname)
+					
+				except:
+					pass
 
 
+
+				print 'LAST.FM genres', genres
+
+				GENRES += genres
+
+			except:
+				pass
+		
 		
 		if 'Myspace' in sources:
-			pass
+			print 'myspace'
+			myspaceINFO = {}
+			soup = BeautifulSoup(br.open(sources['Myspace']).read())
 			
-			
-
-
+			# myspace is not valid for formatting the bandname, for no good reason they are often in all-caps
+			try:	
+				target = soup.findAll(attrs={'class':'odd BandGenres'})[0]
+				for tag in target.findAll(True):
+					tag.replaceWith(tag.renderContents())
+				target = target.renderContents()[8:]
+				genres = self.cleanGenres(target.split(' / '), bandname)
+				print 'MYSPACE genres', genres
+				GENRES += genres
+			except:
+				pass
 		
-		if 'Last.fm' in sources:
-			#scrape last.fm
-			pass
+		if 'Soundcloud' in sources:
+			#scrape soundcloud
+			print 'soundcloud'
+			soundcloudINFO = {}
+			soup = BeautifulSoup(br.open(sources['Soundcloud']).read())
+
 		if 'Bandscamp' in sources:
 			#scrape bandcamp
 			pass
 
-		if 'Soundcloud' in sources:
-			#scrape soundcloud
+			
+
+		INFO = [bandname,'','','']
+
+		temp = []
+
+		for genre in GENRES:
+			# remove vague BS
+			if genre not in ['Rock', 'Alternative', 'Indie', 'Electronic music', 'Jazz']:
+				temp.append(genre)
+
+		# migrate descriptive genres, abandon the rest
+
+		GENRES = temp
+
+		for genre in GENRES:
+			if GENRES.count(genre) > 1:
+				GENRES.remove(genre)
+
+		INFO[1] = self.cleanGenresFinal(GENRES)
+
+		try:
+			INFO[2] = wikiINFO['Origin']
+		except:
 			pass
-
-
-
+		
 	
 		# combine the info collected from all sources
 		
 		positions = {'Genre':1,'Origin':2,'Albumsrc':3}
-		
+		genre_alternative = False
 		
 
-		try:
-			for entry in wikiINFO:
-				INFO[positions[entry]] = wikiINFO[entry]
-		except:
-			pass
+		# quality control
+		
+
+		#Don't bother saying 'US'
+		deleteUS = INFO[2].find(', United States')
+		if deleteUS > -1:
+			INFO[2] = INFO[2][:deleteUS]
+
 		return INFO
 
 		
+
+	def cleanGenres(self, genres, bandname): # standardize the likely spam-filled list of genres collected from all sources into a meaningful pair which will be displayed
+		# remove
+		print genres
+		bannedGenres = ['Experimental', 'Other', 'Vocalist', 'Prog', 'New\sYork', 'Boston', 'Seattle', 'Canad', 'Post-', 'Irish', 'Singer[ -]Songwriter'] # "All music is experimental." - Partick Leonard
+		toRemove = []
+		for genre in genres:
+			for ban in bannedGenres:
+				if re.search(ban, genre, re.I):
+					toRemove.append(genre) # this proxy is required
+		for genre in toRemove:
+			genres.remove(genre)
+
+		# replace and remove band's own name (sometimes on Last.fm as a tag)
+
+		replacements = {'Jazz-rock': 'Jazz Fusion', 'Hip\shop': 'Hip-hop', 'R&amp;b':'R&B'}
+
+		for i, n in enumerate(genres):
+			for repl in replacements:
+				if re.search(repl, n, re.I):
+					genres[i] = replacements[repl]
+			if bandname.lower() in n.lower():
+				genres.remove(n)
+		
+		
+		# capitalize
+
+		for genre in genres:
+			ind = genres.index(genre)
+			genres[ind] = string.capitalize(genre.replace('&#160;', ' '))
+		return genres
+
+
+
+	def cleanGenresFinal(self, genres):
+		
+		print genres
+
+		workingList = []
+
+		overlaps = []
+
+		# get rid of redundancy, choose more descriptive phrases over lesser ones
+
+
+		wordDict = defaultdict(list)
+		for genre in genres:
+			genre_lower = genre.lower()
+			for word in genre_lower.split():
+				wordDict[word.lower()].append(genre)
+		for word, occurrences in wordDict.iteritems():
+			if len(occurrences) > 1:
+				overlaps += occurrences				
+				print word, occurrences
+				remove = []
+		
+		rest = list(set(genres).difference(set(overlaps)))
+		
+		for genre in overlaps:
+			if overlaps.count(genre) > 1:
+				overlaps.remove(genre)
+
+		print 'working', workingList, 'rest', rest, 'overlaps', overlaps
+
+		while len(workingList) < 2:
+			if len(workingList) == 0:
+				try:
+					workingList.append(overlaps[0])
+				except:
+					pass
+			try:
+				workingList.append(rest.pop())
+			except:
+				break	
+						
+							
+		return workingList
+
+
+
+
 # scraping functions
 # format: [ showID, venueID, Date, Time, Price, 21+, Bands ]
 
@@ -458,7 +667,8 @@ class scapebot():
 		from email.MIMEBase import MIMEBase
 		from email.Utils import COMMASPACE, formatdate
 		To = [To]
-		From = 'scapebot <artur.sapek@gmail.com>'
+		From = 'scapebot'
+		smtpPass = open('smtppass.txt').readline()[0:9]
 		assert type(To) == list
 		Msg = MIMEMultipart()
 		Msg['From'] = From
