@@ -50,7 +50,7 @@ class scapebot():
 			if show:
 				ID += 1
 				show.insert(0, ID)
-				print show
+			#	print show
 				writer.writerow(tuple(show))
 
 			
@@ -99,6 +99,7 @@ class scapebot():
 		if not bandfound:
 			return 'No band with that ID'
 	
+
 	def researchBand(self, bandname): # will research band if a new entry is required (which will be more often than not for a long time)
 		# set some quality-assurance variables :) <3
 		nameFormatted = False
@@ -131,9 +132,7 @@ class scapebot():
 				b.replaceWith(b.renderContents())
 			suggestion = suggestion.renderContents().replace('"', '').replace('- ', '-').replace('&quot', '').replace(';', '')
 			bandname = suggestion
-			if wuLyfCoefficient:
-				bandname = bandname[:bandname.find(' music')]
-			print bandname, ' < suggested'
+		#	print bandname, ' < suggested'
 		except:
 			pass
 		
@@ -183,7 +182,7 @@ class scapebot():
 				pass
 
 
-		print sources
+	#	print sources
 	
 		# need to append genre, origin, and album cover
 
@@ -192,14 +191,14 @@ class scapebot():
 			#scrape wikipedia
 			wikiINFO = {}
 			soup = BeautifulSoup(br.open(sources['Wikipedia']).read())
-			print 'wiki'
+		#	print 'wiki'
 
 			try:
 				#redefine bandname with formatting from wiki header, band names can be weird, number 1 trusted source for name formatting
 
 				bandname = soup.h1.renderContents().replace(' (musician)', '').replace(' (band)', '')			
 				nameFormatted = True # name formatting done, that was easy :)
-				print 'title changed from wikipedia'
+			#	print 'title changed from wikipedia'
 				originInfo = soup.findAll('th', text='Origin')[0].parent.parent.td
 				for link in originInfo('a'):
 					link.replaceWith(link.renderContents())
@@ -263,7 +262,7 @@ class scapebot():
 				#scrape last.fm
 				lastfmINFO = {}
 				soup = BeautifulSoup(br.open(sources['Last.fm']).read())
-				print 'last.fm'
+			#	print 'last.fm'
 				
 				try:
 					soup = str(soup)
@@ -275,7 +274,7 @@ class scapebot():
 						nameMeta = soup.index('itemprop="name"')
 						bandname = soup[nameMeta + 16:]
 						bandname = bandname[:bandname.index('</h1>')]
-						print 'name reformatted from last.fm'
+					#	print 'name reformatted from last.fm'
 						nameFormatted = True
 						
 					# sometimes last.fm will have a band/musician's own name as a tag
@@ -284,9 +283,26 @@ class scapebot():
 				except:
 					pass
 
+				# origin
 
+				
+				try:
+				#	print 'origin from lastfm'
+					soup = str(soup)
+					localityInd = soup.index('p class="origin"') # also a hack, fuckall
+					locality = soup[localityInd:]
+					locality = locality[locality.find('<strong>') + 8:]
+					locality = locality[:locality.index('\n')]
+				#	print 'last.fm origin: ', locality
+						
+				except:
+					pass
 
-				print 'LAST.FM genres', genres
+			#	print 'LAST.FM genres', genres
+
+				lastfmINFO['Genre'] = genres
+				if locality != '</strong>':
+					lastfmINFO['Origin'] = locality
 
 				GENRES += genres
 
@@ -295,7 +311,7 @@ class scapebot():
 		
 		
 		if 'Myspace' in sources:
-			print 'myspace'
+		#	print 'myspace'
 			myspaceINFO = {}
 			soup = BeautifulSoup(br.open(sources['Myspace']).read())
 			
@@ -306,14 +322,15 @@ class scapebot():
 					tag.replaceWith(tag.renderContents())
 				target = target.renderContents()[8:]
 				genres = self.cleanGenres(target.split(' / '), bandname)
-				print 'MYSPACE genres', genres
+			#	print 'MYSPACE genres', genres
 				GENRES += genres
 			except:
 				pass
 		
 		if 'Soundcloud' in sources:
 			#scrape soundcloud
-			print 'soundcloud'
+		#	print 'soundcloud'
+
 			soundcloudINFO = {}
 			soup = BeautifulSoup(br.open(sources['Soundcloud']).read())
 
@@ -340,12 +357,22 @@ class scapebot():
 			if GENRES.count(genre) > 1:
 				GENRES.remove(genre)
 
-		INFO[1] = self.cleanGenresFinal(GENRES)
 
 		try:
-			INFO[2] = wikiINFO['Origin']
+			INFO[1] = self.cleanGenresFinal(GENRES, wikiINFO)
+		except:
+			INFO[1] = self.cleanGenresFinal(GENRES, {})
+
+		try:
+			INFO[2] = self.cleanOrigin(wikiINFO['Origin'])
 		except:
 			pass
+
+		if INFO[2] == '':
+			try:
+				INFO[2] = self.cleanOrigin(lastfmINFO['Origin'])
+			except:
+				pass
 		
 	
 		# combine the info collected from all sources
@@ -368,8 +395,8 @@ class scapebot():
 
 	def cleanGenres(self, genres, bandname): # standardize the likely spam-filled list of genres collected from all sources into a meaningful pair which will be displayed
 		# remove
-		print genres
-		bannedGenres = ['Experimental', 'Other', 'Vocalist', 'Prog', 'New\sYork', 'Boston', 'Seattle', 'Canad', 'Post-', 'Irish', 'Singer[ -]Songwriter'] # "All music is experimental." - Partick Leonard
+	#	print genres
+		bannedGenres = ['Experimental', 'Other', 'Vocalist', 'Prog', 'New\sYork', 'Boston', 'Seattle', 'Canad', 'Post-', 'Irish', 'Singer[ -]Songwriter', 'Ambient'] # "All music is experimental." - Partick Leonard
 		toRemove = []
 		for genre in genres:
 			for ban in bannedGenres:
@@ -399,9 +426,9 @@ class scapebot():
 
 
 
-	def cleanGenresFinal(self, genres):
+	def cleanGenresFinal(self, genres, wikiINFO):
 		
-		print genres
+	#	print genres
 
 		workingList = []
 
@@ -418,7 +445,7 @@ class scapebot():
 		for word, occurrences in wordDict.iteritems():
 			if len(occurrences) > 1:
 				overlaps += occurrences				
-				print word, occurrences
+			#	print word, occurrences
 				remove = []
 		
 		rest = list(set(genres).difference(set(overlaps)))
@@ -429,22 +456,86 @@ class scapebot():
 
 		print 'working', workingList, 'rest', rest, 'overlaps', overlaps
 
-		while len(workingList) < 2:
-			if len(workingList) == 0:
+		
+		
+
+		
+		done = False # we're just beginning!
+
+		# stage 1
+		if len(rest) == 0 and len(overlaps) != 0: # all the genres gathered are similar & probably redundant; use only the shortest one
+			workingList.append(min(overlaps, key=len))
+			done = True
+		
+		if not done:
+			if len(overlaps) != 0:
+				workingList.append(overlaps.pop(0))
+
+			if len(rest) != 0:
+				workingList.append(rest.pop(0))
+			
+			if len(workingList) == 2:
+				done = True
+			else:
+				source = max([overlaps, rest], key=len)
 				try:
-					workingList.append(overlaps[0])
+					workingList.append(source[int(len(source)/2)])
 				except:
 					pass
-			try:
-				workingList.append(rest.pop())
-			except:
-				break	
-						
-							
+
+
+
+
+								
 		return workingList
 
+	def cleanOrigin(self, origin):
+		nickname = False
+		majorCities = {'Seattle': 'Seattle', 'Boston': 'Boston', 'New York, New York': 'NYC', 'Los Angeles': 'LA', 'Portland': 'Portland'}
+		states = ['Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming']
+		postalCodes = {'WA': 'Washington', 'DE': 'Delaware', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'HI': 'Hawaii', 'FL': 'Florida', 'WY': 'Wyoming', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 'TX': 'Texas', 'LA': 'Louisiana', 'NC': 'North Carolina', 'ND': 'North Dakota', 'NE': 'Nebraska', 'TN': 'Tennessee', 'NY': 'New York', 'PA': 'Pennsylvania', 'CA': 'California', 'NV': 'Nevada', 'VA': 'Virginia', 'CO': 'Colorado', 'AK': 'Alaska', 'AL': 'Alabama', 'AR': 'Arkansas', 'VT': 'Vermont', 'IL': 'Illinois', 'GA': 'Georgia', 'IN': 'Indiana', 'IA': 'Iowa', 'OK': 'Oklahoma', 'AZ': 'Arizona', 'ID': 'Idaho', 'CT': 'Connecticut', 'ME': 'Maine', 'MD': 'Maryland', 'MA': 'Massachusetts', 'OH': 'Ohio', 'UT': 'Utah', 'MO': 'Missouri', 'MN': 'Minnesota', 'MI': 'Michigan', 'RI': 'Rhode Island', 'KS': 'Kansas', 'MT': 'Montana', 'MS': 'Mississippi', 'SC': 'South Carolina', 'KY': 'Kentucky', 'OR': 'Oregon', 'SD': 'South Dakota'}
+
+		# don't both specifying states of major cities
+		
+		for city in majorCities:
+			if city in origin:
+				origin = majorCities[city]
+				nickname = True
+
+		# change postal abbreviation to full state name	
+		if not nickname:
+			for code in postalCodes:
+				if code in origin:
+					origin = origin.replace(code, postalCodes[code])
+
+			# cut off after state name
+
+			for state in states:
+				if state.lower() in origin.lower():
+					origin = origin[:origin.lower().index(state.lower()) + len(state)]
+			
+			# remove regions, western, eastern, etc
+
+			for region in ['western', 'eastern', 'northern', 'southern']:
+				r = re.search(region + '\s', origin, re.I)
+				if r:
+					origin = origin.replace(r.group(0), '')
 
 
+			origin = origin.split(', ')
+			
+			for index,word in enumerate(origin):
+				origin[index] = string.capitalize(word)
+			origin = ', '.join(origin)
+
+			origin = origin.split(' ')
+			
+			for index,word in enumerate(origin):
+				origin[index] = string.capitalize(word)
+			origin = ' '.join(origin)
+
+
+		return origin
 
 # scraping functions
 # format: [ showID, venueID, Date, Time, Price, 21+, Bands ]
