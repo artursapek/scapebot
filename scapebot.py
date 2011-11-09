@@ -99,6 +99,12 @@ class scapebot():
 		if not bandfound:
 			return 'No band with that ID'
 	
+	
+	# huge function: researchBand
+	# input: band name
+	# output: [band name formatted, [one or two genres], band's origin (city/state), album cover source local]
+	# called in scraping function for each band in show that's not already in db
+
 
 	def researchBand(self, bandname): # will research band if a new entry is required (which will be more often than not for a long time)
 		# set some quality-assurance variables :) <3
@@ -163,7 +169,7 @@ class scapebot():
 							br = Browser()
 							br.set_handle_robots(False)
 							br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]	
-							if re.search(bandname.replace(' ', '[ -]'), str(BeautifulSoup(br.open(link['href']).read())), flags=re.I):
+							if re.search(bandname.replace(' ', '[ -]?'), str(BeautifulSoup(br.open(link['href']).read())), flags=re.I):
 								try:
 									URL = str(link['href'][:link['href'].index('?')])
 									sources[entry] = URL
@@ -174,6 +180,10 @@ class scapebot():
 								m = re.match('http://www.last.fm/music/[^/]*', sources[entry])
 								if m:
 									sources[entry] = m.group(0)
+							if entry == 'Bandcamp': # clean up bandcamp urls
+								m = re.search('bandcamp.com/', URL)
+								if m:
+									sources[entry] = URL[:URL.find(m.group(0)) + 13]
 						except:
 							break
 					except:
@@ -182,7 +192,7 @@ class scapebot():
 				pass
 
 
-	#	print sources
+		print sources
 	
 		# need to append genre, origin, and album cover
 
@@ -247,7 +257,7 @@ class scapebot():
 				
 				GENRES += genres
 
-				print 'WIKI genres', genres
+			#	print 'WIKI genres', genres
 				
 			except:
 				pass
@@ -324,20 +334,73 @@ class scapebot():
 				genres = self.cleanGenres(target.split(' / '), bandname)
 			#	print 'MYSPACE genres', genres
 				GENRES += genres
+				myspaceINFO['Genres'] = genres
 			except:
 				pass
+
 		
 		if 'Soundcloud' in sources:
 			#scrape soundcloud
-		#	print 'soundcloud'
-
-			soundcloudINFO = {}
+			
+			# genres
+			
+			soundcloudINFO = {'Genres': []}
 			soup = BeautifulSoup(br.open(sources['Soundcloud']).read())
+			target = soup.findAll('span', { 'class' : 'genre' })
+			for genre in target:
+				if genre.renderContents() not in soundcloudINFO['Genres']:
+					soundcloudINFO['Genres'].append(genre.renderContents())
+			soundcloudINFO['Genres'] = self.cleanGenres(soundcloudINFO['Genres'], bandname)
+			print soundcloudINFO
+			GENRES += soundcloudINFO['Genres']
+			
+			# name (if no Wiki which is likely for bands with soundclouds)
+			
+			if 'Wikipedia' not in sources:
+				temp = soup.findAll('h1')[1]
+				if not nameFormatted:		
+					bandname = temp.renderContents()[:temp.renderContents().find('\n')]
+					nameFormatted = True
+				origin = temp.span.renderContents()
+				soundcloudINFO['Origin'] = origin
 
-		if 'Bandscamp' in sources:
+			print soundcloudINFO
+
+				
+
+		if 'Bandcamp' in sources:
 			#scrape bandcamp
-			pass
-
+			temp = []
+			bandcampINFO = {}
+			soup = BeautifulSoup(br.open(sources['Bandcamp'] + '/releases').read())
+			tags = soup.findAll('dd', attrs={ 'class' : 'tralbumData' })
+			for tagsPossible in tags:
+				if 'tags:' in tagsPossible.renderContents():
+					tags = tagsPossible
+					break
+			for a in tags('a'):
+				temp.append(a.renderContents())
+			x = 1
+			if temp[len(temp) - 1].split(' ')[0][0].isupper():
+				bandcampINFO['Origin'] = temp[len(temp) - 1]
+				x = 2
+			print temp
+			bandcampINFO['Genres'] = temp[:len(temp) - x]
+			GENRES += self.cleanGenres(bandcampINFO['Genres'], bandname)
+			# if we get bandcamp its often going to be the only source so let's milk it
+			if not nameFormatted:
+				namesection = soup.findAll('dl', attrs={ 'id' : 'name-section' })[0]
+				artistname = namesection.span
+				for a in artistname('a'):
+					a.replaceWith(a.renderContents())
+				bandname = artistname.renderContents().split()
+				# uncapitalized names are probably a result of negligence and not a creative choice if this is the only source of info for this band
+				for index, word in enumerate(bandname):
+					bandname[index] = string.capitalize(word)
+				bandname = ' '.join(bandname)
+				nameFormatted = True
+			
+			
 			
 
 		INFO = [bandname,'','','']
@@ -346,7 +409,7 @@ class scapebot():
 
 		for genre in GENRES:
 			# remove vague BS
-			if genre not in ['Rock', 'Alternative', 'Indie', 'Electronic music', 'Jazz']:
+			if genre not in ['Rock', 'Alternative', 'Indie']: 
 				temp.append(genre)
 
 		# migrate descriptive genres, abandon the rest
@@ -363,17 +426,29 @@ class scapebot():
 		except:
 			INFO[1] = self.cleanGenresFinal(GENRES, {})
 
-		try:
-			INFO[2] = self.cleanOrigin(wikiINFO['Origin'])
-		except:
-			pass
-
-		if INFO[2] == '':
+		if 'Wikipedia' in sources:
 			try:
-				INFO[2] = self.cleanOrigin(lastfmINFO['Origin'])
+				INFO[2] = self.cleanOrigin(wikiINFO['Origin'], bandname)
 			except:
 				pass
-		
+		if INFO[2] == '' and 'Last.fm' in sources:
+			try: 
+				INFO[2] = self.cleanOrigin(lastfmINFO['Origin'], bandname)
+			except:
+				pass
+		if INFO[2] == '' and 'Soundcloud' in sources:
+			try:
+				INFO[2] = self.cleanOrigin(soundcloudINFO['Origin'], bandname)
+			except:
+				pass
+		if INFO[2] == '' and 'Bandcamp' in sources:
+			try:
+				INFO[2] = self.cleanOrigin(bandcampINFO['Origin'], bandname)
+			except:
+				pass
+
+
+				
 	
 		# combine the info collected from all sources
 		
@@ -407,13 +482,13 @@ class scapebot():
 
 		# replace and remove band's own name (sometimes on Last.fm as a tag)
 
-		replacements = {'Jazz-rock': 'Jazz Fusion', 'Hip\shop': 'Hip-hop', 'R&amp;b':'R&B'}
+		replacements = {'Jazz-rock': 'Jazz Fusion', 'Hip\s?hop': 'Hip-hop', 'R&amp;b':'R&B', 'Electronic':'Electronica'} # attention to detail is the most important part
 
 		for i, n in enumerate(genres):
 			for repl in replacements:
 				if re.search(repl, n, re.I):
 					genres[i] = replacements[repl]
-			if bandname.lower() in n.lower():
+			if bandname.lower() in n.lower() or len(n.split()) > 3: # second part dubbed the Gorge Mand rule, thank you Alina. "tags: [...], Kreayshawn can suck my clit, [...]"
 				genres.remove(n)
 		
 		
@@ -454,7 +529,7 @@ class scapebot():
 			if overlaps.count(genre) > 1:
 				overlaps.remove(genre)
 
-		print 'working', workingList, 'rest', rest, 'overlaps', overlaps
+	#	print 'working', workingList, 'rest', rest, 'overlaps', overlaps
 
 		
 		
@@ -489,9 +564,9 @@ class scapebot():
 								
 		return workingList
 
-	def cleanOrigin(self, origin):
+	def cleanOrigin(self, origin, bandname):
 		nickname = False
-		majorCities = {'Seattle': 'Seattle', 'Boston': 'Boston', 'New York, New York': 'NYC', 'Los Angeles': 'LA', 'Portland': 'Portland'}
+		majorCities = {'Seattle': 'Seattle', 'Boston': 'Boston', 'Los Angeles': 'LA', 'Portland': 'Portland', 'Providence': 'Providence', 'Long Beach, California': 'Long Beach'}
 		states = ['Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming']
 		postalCodes = {'WA': 'Washington', 'DE': 'Delaware', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'HI': 'Hawaii', 'FL': 'Florida', 'WY': 'Wyoming', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 'TX': 'Texas', 'LA': 'Louisiana', 'NC': 'North Carolina', 'ND': 'North Dakota', 'NE': 'Nebraska', 'TN': 'Tennessee', 'NY': 'New York', 'PA': 'Pennsylvania', 'CA': 'California', 'NV': 'Nevada', 'VA': 'Virginia', 'CO': 'Colorado', 'AK': 'Alaska', 'AL': 'Alabama', 'AR': 'Arkansas', 'VT': 'Vermont', 'IL': 'Illinois', 'GA': 'Georgia', 'IN': 'Indiana', 'IA': 'Iowa', 'OK': 'Oklahoma', 'AZ': 'Arizona', 'ID': 'Idaho', 'CT': 'Connecticut', 'ME': 'Maine', 'MD': 'Maryland', 'MA': 'Massachusetts', 'OH': 'Ohio', 'UT': 'Utah', 'MO': 'Missouri', 'MN': 'Minnesota', 'MI': 'Michigan', 'RI': 'Rhode Island', 'KS': 'Kansas', 'MT': 'Montana', 'MS': 'Mississippi', 'SC': 'South Carolina', 'KY': 'Kentucky', 'OR': 'Oregon', 'SD': 'South Dakota'}
 
@@ -520,6 +595,13 @@ class scapebot():
 				r = re.search(region + '\s', origin, re.I)
 				if r:
 					origin = origin.replace(r.group(0), '')
+
+
+			regexbandname = '\s\s?'.join(bandname.split(' ')) + '[^w]\s?'  # make sure they didnt repeat their name in their location for some stupid reason
+
+			temp = re.search(regexbandname, origin, re.I)
+			if temp:
+				origin = origin.replace(origin[origin.find(temp.group(0)):len(temp.group(0))], '')
 
 
 			origin = origin.split(', ')
