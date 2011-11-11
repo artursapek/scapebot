@@ -63,7 +63,6 @@ class scapebot():
 
 	# these functions will be used several times per show when scraping shows:
 
-
 	# hangs up on Facebook pages
 
 	def checkBand(self, bandname): # checks if a band exists in the db, if not this will redirect to research band
@@ -100,37 +99,63 @@ class scapebot():
 			return 'No band with that ID'
 	
 	
+	# Googles something, returns the results as BeautifulSoup
+
+	def Google(self, query):
+		br = Browser()
+		br.set_handle_robots(False)
+		br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]						
+		br.open('http://google.com')
+		br.select_form(nr=0)
+		if len(query) / len(query.split()) <= 3:
+			query = '"%s"' % query
+			wuLyfCoefficient = False
+		else:
+			query = '%s' % query
+			wuLyfCoefficient = True
+		br['q'] = query
+		soup = BeautifulSoup(br.submit().read())
+		return soup
+
+
 	# huge function: researchBand
 	# input: band name
 	# output: [band name formatted, [one or two genres], band's origin (city/state), album cover source local]
 	# called in scraping function for each band in show that's not already in db
 
 
-	def researchBand(self, bandname): # will research band if a new entry is required (which will be more often than not for a long time)
+	def researchBand(self, bandname):
 		# set some quality-assurance variables :) <3
 		nameFormatted = False
 		GENRES = []
-
-		
-		# OKAY. first things first: Google them.
-		br = Browser()
-		br.set_handle_robots(False)
-		br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]						
-		br.open('http://google.com')
-
-		br.select_form(nr=0)
-		query = '%s' % bandname
-		if len(bandname) / len(bandname.split()) <= 3:
-			query = '"%s"' % bandname
-			wuLyfCoefficient = False
-		else:
-			query = '%s' % bandname
-			wuLyfCoefficient = True
-		br['q'] = query
-		soup = BeautifulSoup(br.submit().read())
-		results = soup.findAll('ol', attrs={'id': 'rso'})[0]
+		results = ''
 		sources = {}
-		try:
+		
+		# :)
+
+		br = Browser()
+
+		# search specifically for for pages that smaller bands would probably have
+
+		# Google's search for Myspace kind of sucks
+
+		myspaceMusic_soup = self.Google('%s music myspace' % bandname)
+		myspaceMusic_results = myspaceMusic_soup.findAll('ol', attrs={ 'id': 'rso' })[0]
+		for li in myspaceMusic_results('li'):
+			link = li.div.h3.a
+			soup = BeautifulSoup(br.open(link['href']).read())
+			if re.search('myspace.com', link['href']) and re.search(bandname.replace(' ', '[ -]?'), str(soup), flags=re.I) and len(soup.findAll('h5', attrs={ 'class' : 'showCount' })) > 0:
+				sources['Myspace'] = str(link['href'])
+				break
+
+
+
+		# google the band
+		soup = self.Google(bandname)
+
+		results = soup.findAll('ol', attrs={'id': 'rso'})[0]
+
+		try: # see if Google is fixing a typo
 			suggestion = soup.findAll('p', attrs={ 'class' : 'sp_cnt' })[0].a
 			for i in suggestion('i'):
 				i.replaceWith(i.renderContents())
@@ -138,12 +163,11 @@ class scapebot():
 				b.replaceWith(b.renderContents())
 			suggestion = suggestion.renderContents().replace('"', '').replace('- ', '-').replace('&quot', '').replace(';', '')
 			bandname = suggestion
-		#	print bandname, ' < suggested'
+		# print bandname, ' < suggested'
 		except:
 			pass
 		
 
-		
 
 
 		for li in results('li'):
@@ -155,7 +179,7 @@ class scapebot():
 				#print li.a.renderContents() 
 				link = li.div.h3.a
 				#print link.renderContents()
-				knownSources = {'Wikipedia': 'wikipedia.org', 'Last.fm': 'last.fm/music', 'Facebook': 'facebook.com', 'Bandcamp': 'bandcamp.com', 'Myspace': 'myspace.com', 'Soundcloud': 'soundcloud.com'}
+				knownSources = {'Wikipedia': 'wikipedia.org', 'Last.fm': 'last.fm/music', 'Bandcamp': 'bandcamp.com', 'Myspace': 'myspace.com', 'Soundcloud': 'soundcloud.com'}
 				for entry in knownSources:
 					try:
 						temp = link['href'].index(knownSources[entry])
@@ -471,7 +495,7 @@ class scapebot():
 	def cleanGenres(self, genres, bandname): # standardize the likely spam-filled list of genres collected from all sources into a meaningful pair which will be displayed
 		# remove
 	#	print genres
-		bannedGenres = ['Experimental', 'Other', 'Vocalist', 'Prog', 'New\sYork', 'Boston', 'Seattle', 'Canad', 'Post-', 'Irish', 'Singer[ -]Songwriter', 'Ambient'] # "All music is experimental." - Partick Leonard
+		bannedGenres = ['Experimental', 'Other', 'Vocalist', 'Prog', 'New\sYork', 'Boston', 'Seattle', 'Canad', 'Post[ -]', 'Irish', 'Singer[ -]Songwriter', 'Ambient', 'British'] # "All music is experimental." - Partick Leonard
 		toRemove = []
 		for genre in genres:
 			for ban in bannedGenres:
@@ -521,7 +545,6 @@ class scapebot():
 			if len(occurrences) > 1:
 				overlaps += occurrences				
 			#	print word, occurrences
-				remove = []
 		
 		rest = list(set(genres).difference(set(overlaps)))
 		
@@ -529,7 +552,7 @@ class scapebot():
 			if overlaps.count(genre) > 1:
 				overlaps.remove(genre)
 
-	#	print 'working', workingList, 'rest', rest, 'overlaps', overlaps
+		print 'working', workingList, 'rest', rest, 'overlaps', overlaps
 
 		
 		
@@ -538,9 +561,11 @@ class scapebot():
 		done = False # we're just beginning!
 
 		# stage 1
-		if len(rest) == 0 and len(overlaps) != 0: # all the genres gathered are similar & probably redundant; use only the shortest one
+		if len(rest) == 0 and len(overlaps) != 0: # all the genres gathered are similar & probably redundant; use shortest one, be concise
 			workingList.append(min(overlaps, key=len))
 			done = True
+
+		
 		
 		if not done:
 			if len(overlaps) != 0:
@@ -564,10 +589,14 @@ class scapebot():
 								
 		return workingList
 
+
 	def cleanOrigin(self, origin, bandname):
+
 		nickname = False
 		majorCities = {'Seattle': 'Seattle', 'Boston': 'Boston', 'Los Angeles': 'LA', 'Portland': 'Portland', 'Providence': 'Providence', 'Long Beach, California': 'Long Beach'}
+		
 		states = ['Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming']
+
 		postalCodes = {'WA': 'Washington', 'DE': 'Delaware', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'HI': 'Hawaii', 'FL': 'Florida', 'WY': 'Wyoming', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 'TX': 'Texas', 'LA': 'Louisiana', 'NC': 'North Carolina', 'ND': 'North Dakota', 'NE': 'Nebraska', 'TN': 'Tennessee', 'NY': 'New York', 'PA': 'Pennsylvania', 'CA': 'California', 'NV': 'Nevada', 'VA': 'Virginia', 'CO': 'Colorado', 'AK': 'Alaska', 'AL': 'Alabama', 'AR': 'Arkansas', 'VT': 'Vermont', 'IL': 'Illinois', 'GA': 'Georgia', 'IN': 'Indiana', 'IA': 'Iowa', 'OK': 'Oklahoma', 'AZ': 'Arizona', 'ID': 'Idaho', 'CT': 'Connecticut', 'ME': 'Maine', 'MD': 'Maryland', 'MA': 'Massachusetts', 'OH': 'Ohio', 'UT': 'Utah', 'MO': 'Missouri', 'MN': 'Minnesota', 'MI': 'Michigan', 'RI': 'Rhode Island', 'KS': 'Kansas', 'MT': 'Montana', 'MS': 'Mississippi', 'SC': 'South Carolina', 'KY': 'Kentucky', 'OR': 'Oregon', 'SD': 'South Dakota'}
 
 		# don't both specifying states of major cities
