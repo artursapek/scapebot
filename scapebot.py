@@ -11,6 +11,7 @@ from collections import defaultdict
 import csv
 import string
 import re
+from PIL import Image
 
 
 
@@ -138,6 +139,7 @@ class scapebot():
 		return bandname.replace(' ', '[- ]?').replace('&', 'and|&').replace('and', 'and|&').replace('DJ ', '(DJ\s)?').replace('dj ', '(dj\s)?')
 
 
+
 	# huge function: researchBand
 	# input: band name
 	# output: [band name formatted, [one or two genres], band's origin (city/state), album cover source local]
@@ -149,6 +151,7 @@ class scapebot():
 		GENRES = []
 		results = ''
 		sources = {}
+		newestAlbumName = None
 		
 		# yes I'm a bastard
 
@@ -325,7 +328,31 @@ class scapebot():
 				
 			except:
 				pass
-			# genres done
+			# genres done, now try to get the name of the most recent album
+			# wikipedia is mad inconsistent with how they list albums. fuckall. this will be difficult, I'll come back later
+			
+			ALBUMSLIST = None
+			
+			try:
+				regexAlbums = re.compile('album', re.I)
+				discog = soup.findAll('span', attrs={ 'class' : 'mw-headline'})
+				for i, n in enumerate(discog):
+					if re.search('album', n.renderContents(), re.I):
+						ALBUMSLIST = n.parent.nextSibling.nextSibling.findAll('li')
+						newest = ALBUMSLIST[len(ALBUMSLIST) - 1]
+						if newest.i:
+							if newest.i.a: newestAlbumName = newest.i.a.renderContents()
+							else: newestAlbumName = newest.i.renderContents()
+							
+				if ALBUMSLIST != None: print newestAlbumName
+				
+
+					
+				
+			except:
+				pass
+
+
 
 
 
@@ -746,7 +773,7 @@ class scapebot():
 
 	# Album_cover function. going to be super dank. seperate from rest of researchBand
 	# Testing With The Big Echo By The Morning Benders
-	def getAlbumCover(self):
+	def getAlbumCover(self, newestAlbumName):
 		sources = {}
 		br = self.freeBrowser()
 		if 'Wikipedia' in sources:
@@ -763,14 +790,14 @@ class scapebot():
 
 		cover.close()
 
-		cover = Image.open('./covers/m/TheMorningBenders.jpg').resize( (80,80) )
+		cover = Image.open('./covers/m/TheMorningBenders.jpg').resize( (80,80), Image.ANTIALIAS )
 		try:
 			cover.save('./covers/m/TheMorningBenders.jpg', 'JPEG')
 		except:
 			print 'resize save error!'
 
 
-
+	
 
 
 
