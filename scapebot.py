@@ -11,7 +11,7 @@ from collections import defaultdict
 import csv
 import string
 import re
-from PIL import Image
+#from PIL import Image
 
 
 
@@ -131,12 +131,12 @@ class scapebot():
 			wuLyfCoefficient = True
 		br['q'] = query
 		soup = BeautifulSoup(br.submit().read())
-		return soup
+		return soup.findAll('ol', attrs={ 'id': 'rso' })[0]
 
 	# band names are so difficult :(
 
 	def regexifyBandname(self, bandname):
-		return bandname.replace(' ', '[- ]?').replace('&', 'and|&').replace('and', 'and|&').replace('DJ ', '(DJ\s)?').replace('dj ', '(dj\s)?')
+		return bandname.replace(' ', '[-,]?\s?').replace('&', 'and|&').replace('and', 'and|&').replace('DJ ', '(DJ\s)?').replace('dj ', '(dj\s)?')
 
 
 
@@ -180,8 +180,7 @@ class scapebot():
 
 		# find Myspace
 		
-		myspaceMusic_soup = self.Google('%s music myspace' % bandname)
-		myspaceMusic_results = myspaceMusic_soup.findAll('ol', attrs={ 'id': 'rso' })[0]
+		myspaceMusic_results = self.Google('%s music myspace' % bandname)
 		for li in myspaceMusic_results('li'):
 			try:
 				link = li.div.h3.a
@@ -194,12 +193,12 @@ class scapebot():
 
 		# find Wikipedia
 
-		wiki_soup = self.Google('%s music wikipedia' % bandname)
-		wiki_results = wiki_soup.findAll('ol', attrs={ 'id': 'rso' })[0]
+		wiki_results = self.Google('%s music wikipedia' % bandname)
 		for li in wiki_results('li'):
 			try:
 				link = li.div.h3.a
 				soup = BeautifulSoup(br.open(link['href']).read())
+				'made it this far...'
 				if re.search('wikipedia.org', link['href']) and re.search(self.regexifyBandname(bandname), str(soup), flags=re.I) and len(soup.findAll('a', href='/wiki/Music_genre')) > 0 and re.search(self.regexifyBandname(bandname), soup.h1.renderContents(), re.I):
 					sources['Wikipedia'] = str(link['href'])
 					break
@@ -208,12 +207,7 @@ class scapebot():
 
 
 		# google the band
-		soup = self.Google(bandname)
-
-		results = soup.findAll('ol', attrs={'id': 'rso'})[0]
-
-				
-
+		results = self.Google(bandname)
 
 
 		for li in results('li'):
@@ -236,7 +230,7 @@ class scapebot():
 							#print '.', knownSources[entry], self.sanitize(bandname) 
 							#print link['href']
 							
-							if re.search(bandname.replace(' ', '[ -]?'), str(BeautifulSoup(br.open(link['href']).read())), flags=re.I):
+							if re.search(self.regexifyBandname(bandname), str(BeautifulSoup(br.open(link['href']).read())), flags=re.I):
 								try:
 									URL = str(link['href'][:link['href'].index('?')])
 									sources[entry] = URL
@@ -259,7 +253,7 @@ class scapebot():
 				pass
 
 
-	#	print sources
+		print sources
 	
 		# need to append genre, origin, and album cover
 
@@ -329,28 +323,60 @@ class scapebot():
 			except:
 				pass
 			# genres done, now try to get the name of the most recent album
-			# wikipedia is mad inconsistent with how they list albums. fuckall. this will be difficult, I'll come back later
+			# wikipedia is mad inconsistent with how they list albums. fuckall. this might be difficult, I'll come back later
 			
-			ALBUMSLIST = None
-			
-			try:
-				regexAlbums = re.compile('album', re.I)
-				discog = soup.findAll('span', attrs={ 'class' : 'mw-headline'})
-				for i, n in enumerate(discog):
-					if re.search('album', n.renderContents(), re.I):
-						ALBUMSLIST = n.parent.nextSibling.nextSibling.findAll('li')
-						newest = ALBUMSLIST[len(ALBUMSLIST) - 1]
-						if newest.i:
-							if newest.i.a: newestAlbumName = newest.i.a.renderContents()
-							else: newestAlbumName = newest.i.renderContents()
-							
-				if ALBUMSLIST != None: print newestAlbumName
-				
+			# Find Newest Album
+			# still a lot of work to do on this
 
-					
-				
+			ALBUMSLIST = None
+			ALBUMSTABLE = None
+	
+			# if there's a link to the discography follow it
+			try:
+				soup = BeautifulSoup(br.follow_link(text_regex=r'.*discography', nr=0).read())
 			except:
 				pass
+
+			try:
+				for t in soup.findAll('table'):
+					try:
+						if re.search('detail|title', t.findAll('th')[1].renderContents(), re.I):
+							ALBUMSTABLE = t
+							break
+					except:
+						pass
+				print ALBUMSTABLE
+				if ALBUMSTABLE != None:
+					rows = ALBUMSTABLE.findAll('tr')
+					goUp = 1
+					target = rows[len(rows) - goUp]							
+					while re.search('denotes releases that did not chart', target.renderContents(), re.I) or re.search('to be released', target.renderContents(), re.I):
+						goUp += 1
+						target = rows[len(rows) - goUp]							
+					target = target.i
+					for a in target('a'):
+						a.replaceWith(a.renderContents())
+					for b in target('b'):
+						b.replaceWith(b.renderContents())
+					target = target.renderContents()
+					newestAlbumName = target
+							
+				
+				# or it could be 
+				if not newestAlbumName:
+					discog = soup.findAll('span', attrs={ 'class' : 'mw-headline'})				
+					for i, n in enumerate(discog):
+						if re.search('album', n.renderContents(), re.I):
+							ALBUMSLIST = n.parent.nextSibling.nextSibling.findAll('li')
+							newest = ALBUMSLIST[len(ALBUMSLIST) - 1]
+							print newest
+							if newest.i:
+								if newest.i.a: newestAlbumName = newest.i.a.renderContents()
+								else: newestAlbumName = newest.i.renderContents()
+				print newestAlbumName			
+			except:
+				pass
+
 
 
 
@@ -597,7 +623,8 @@ class scapebot():
 	def cleanGenres(self, genres, bandname): # standardize the likely spam-filled list of genres collected from all sources into a meaningful pair which will be displayed
 		# remove
 	#	print genres
-		bannedGenres = ['Experimental', 'Other', 'Vocalist', 'Prog', 'Hard Rock' ,'New\sYork', 'Boston', 'Seattle', 'Canad', 'Post[ -]', 'Irish', 'Singer[ -]Songwriter', 'Ambient', 'Swedish', 'Underground', 'Scotland'] # "All music is experimental." - Partick Leonard
+		bannedGenres = ['Experimental', 'Other', 'Vocalist', 'Prog', 'Hard Rock' ,'New\sYork', 'Boston', 'Seattle', 'Canad', 'Post[ -]', 'Singer[ -]Songwriter', 
+						'Ambient', 'Underground', 'Scotland', 'ish'] # "All music is experimental." - Partick Leonard
 		toRemove = []
 		for genre in genres:
 			for ban in bannedGenres:
@@ -620,7 +647,7 @@ class scapebot():
 			for repl in replacements:
 				r = re.search(repl, n, re.I)
 				if r:
-					print r.group(0)
+					# print r.group(0)
 					genres[i] = genres[i].replace(r.group(0), replacements[repl])
 
 		
