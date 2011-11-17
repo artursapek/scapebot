@@ -11,6 +11,7 @@ from collections import defaultdict
 import csv
 import string
 import re
+import unicodedata
 #from PIL import Image
 
 
@@ -23,6 +24,31 @@ class scapebot():
 		months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 		global monthsabbr 
 		monthsabbr = ['Jan', 'Feb', 'Mar', 'April', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+		global asciiMatches
+		asciiMatches = {
+			0xc0:'A', 0xc1:'A', 0xc2:'A', 0xc3:'A', 0xc4:'A', 0xc5:'A',
+			0xc6:'Ae', 0xc7:'C',
+			0xc8:'E', 0xc9:'E', 0xca:'E', 0xcb:'E',
+			0xcc:'I', 0xcd:'I', 0xce:'I', 0xcf:'I',
+			0xd0:'Th', 0xd1:'N',
+			0xd2:'O', 0xd3:'O', 0xd4:'O', 0xd5:'O', 0xd6:'O', 0xd8:'O',
+			0xd9:'U', 0xda:'U', 0xdb:'U', 0xdc:'U',
+			0xdd:'Y', 0xde:'th', 0xdf:'ss',
+			0xe0:'a', 0xe1:'a', 0xe2:'a', 0xe3:'a', 0xe4:'a', 0xe5:'a',
+			0xe6:'ae', 0xe7:'c',
+			0xe8:'e', 0xe9:'e', 0xea:'e', 0xeb:'e',
+			0xec:'i', 0xed:'i', 0xee:'i', 0xef:'i',
+			0xf0:'th', 0xf1:'n',
+			0xf2:'o', 0xf3:'o', 0xf4:'o', 0xf5:'o', 0xf6:'o', 0xf8:'o',
+			0xf9:'u', 0xfa:'u', 0xfb:'u', 0xfc:'u',
+			0xfd:'y', 0xfe:'th', 0xff:'y',
+			0xa1:'!'	}
+		global states
+		states = [ 'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 
+					'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 
+					'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+					'West Virginia', 'Wisconsin', 'Wyoming' ]
+
 
 	def sanitize(self, x): #clean up names which are often not spelled consistently
 		for i in range(1, 32):
@@ -136,9 +162,18 @@ class scapebot():
 	# band names are so difficult :(
 
 	def regexifyBandname(self, bandname):
-		return bandname.replace(' ', '[-,]?\s?').replace('&', 'and|&').replace('and', 'and|&').replace('DJ ', '(DJ\s)?').replace('dj ', '(dj\s)?')
-
-
+		
+		bandname = bandname.replace(' ', '[-,]?\s?').replace('&', 'and|&').replace('and', 'and|&').replace('DJ ', '(DJ\s)?').replace('dj ', '(dj\s)?')
+		r = ''
+		for i in bandname:
+			if asciiMatches.has_key(ord(i)):
+				r += asciiMatches[ord(i)]
+			elif ord(i) >= 0x80:
+				pass
+			else:
+				r += i
+		
+		return str(r)
 
 	# huge function: researchBand
 	# input: band name
@@ -184,10 +219,11 @@ class scapebot():
 		for li in myspaceMusic_results('li'):
 			try:
 				link = li.div.h3.a
-				soup = BeautifulSoup(br.open(link['href']).read())
-				if re.search('myspace.com', link['href']) and re.search(self.regexifyBandname(bandname), str(soup), flags=re.I) and len(soup.findAll('h3', text='General Info', attrs={ 'class' : 'moduleHead' })) > 0:
-					sources['Myspace'] = str(link['href'])
-					break
+				if re.search('myspace.com', link['href']):
+					soup = BeautifulSoup(br.open(link['href']).read())
+					if re.search(self.regexifyBandname(bandname), str(soup), flags=re.I) and len(soup.findAll('h3', text='General Info', attrs={ 'class' : 'moduleHead' })) > 0:
+						sources['Myspace'] = str(link['href'])
+						break
 			except:
 				pass
 
@@ -197,11 +233,28 @@ class scapebot():
 		for li in wiki_results('li'):
 			try:
 				link = li.div.h3.a
-				soup = BeautifulSoup(br.open(link['href']).read())
-				'made it this far...'
-				if re.search('wikipedia.org', link['href']) and re.search(self.regexifyBandname(bandname), str(soup), flags=re.I) and len(soup.findAll('a', href='/wiki/Music_genre')) > 0 and re.search(self.regexifyBandname(bandname), soup.h1.renderContents(), re.I):
-					sources['Wikipedia'] = str(link['href'])
-					break
+				if re.search('wikipedia.org', link['href']):
+					soup = BeautifulSoup(br.open(link['href']).read())
+					if re.search(self.regexifyBandname(bandname), str(soup), flags=re.I) and len(soup.findAll('a', href='/wiki/Music_genre')) > 0 and re.search(self.regexifyBandname(bandname), soup.h1.renderContents(), re.I):
+						sources['Wikipedia'] = str(link['href'])
+						break
+			except:
+				pass
+
+		# search for bandcamp
+
+		bandcamp_results = self.Google('%s bandcamp' % bandname)
+		for li in bandcamp_results('li'):
+			try:
+				link = li.div.h3.a
+				URL = link['href']
+				m = re.search('bandcamp.com', URL) # this extra step makes sure we don't end up with the root URL of someone who mentions the bandname in a song title or some shit
+				if m:
+					URL = str(URL[:URL.find(m.group(0)) + 12])
+					soup = BeautifulSoup(br.open(URL).read())
+					if re.search(self.regexifyBandname(bandname), str(soup), flags=re.I) and re.search(self.regexifyBandname(bandname), str(soup), re.I):
+						sources['Bandcamp'] = URL
+						break
 			except:
 				pass
 
@@ -219,7 +272,7 @@ class scapebot():
 				#print li.a.renderContents() 
 				link = li.div.h3.a
 				#print link.renderContents()
-				knownSources = {'Last.fm': 'last.fm/music', 'Bandcamp': 'bandcamp.com', 'Soundcloud': 'soundcloud.com'}
+				knownSources = {'Last.fm': 'last.fm/music', 'Soundcloud': 'soundcloud.com'}
 				for entry in knownSources:
 					try:
 						temp = link['href'].index(knownSources[entry])
@@ -241,10 +294,6 @@ class scapebot():
 								m = re.match('http://www.last.fm/music/[^/]*', sources[entry])
 								if m:
 									sources[entry] = m.group(0)
-							if entry == 'Bandcamp': # clean up bandcamp urls
-								m = re.search('bandcamp.com/', URL)
-								if m:
-									sources[entry] = URL[:URL.find(m.group(0)) + 13]
 						except:
 							break
 					except:
@@ -345,12 +394,11 @@ class scapebot():
 							break
 					except:
 						pass
-				print ALBUMSTABLE
 				if ALBUMSTABLE != None:
 					rows = ALBUMSTABLE.findAll('tr')
 					goUp = 1
 					target = rows[len(rows) - goUp]							
-					while re.search('denotes releases that did not chart', target.renderContents(), re.I) or re.search('to be released', target.renderContents(), re.I):
+					while re.search('denotes releases that did not chart', target.renderContents(), re.I) or re.search('to be released|2012', target.renderContents(), re.I):
 						goUp += 1
 						target = rows[len(rows) - goUp]							
 					target = target.i
@@ -369,7 +417,6 @@ class scapebot():
 						if re.search('album', n.renderContents(), re.I):
 							ALBUMSLIST = n.parent.nextSibling.nextSibling.findAll('li')
 							newest = ALBUMSLIST[len(ALBUMSLIST) - 1]
-							print newest
 							if newest.i:
 								if newest.i.a: newestAlbumName = newest.i.a.renderContents()
 								else: newestAlbumName = newest.i.renderContents()
@@ -544,7 +591,7 @@ class scapebot():
 			bandname = '-'.join(bandname)
 			nameFormatted = True
 
-		INFO = [bandname,'','','']
+		INFO = [self.cleanBandname(bandname),'','','']
 
 		temp = []
 
@@ -617,14 +664,18 @@ class scapebot():
 			return INFO
 		else:
 			return 'Not found'
+	
+	
 
-		
+	def cleanBandname(self, name):
+		return name.replace('&amp;', '&')
 
 	def cleanGenres(self, genres, bandname): # standardize the likely spam-filled list of genres collected from all sources into a meaningful pair which will be displayed
 		# remove
 	#	print genres
 		bannedGenres = ['Experimental', 'Other', 'Vocalist', 'Prog', 'Hard Rock' ,'New\sYork', 'Boston', 'Seattle', 'Canad', 'Post[ -]', 'Singer[ -]Songwriter', 
-						'Ambient', 'Underground', 'Scotland', 'ish'] # "All music is experimental." - Partick Leonard
+						'Ambient', 'Underground', 'Scotland', 'ish', 'Freestyle', 'Good music'] # "All music is experimental." - Partick Leonard
+		bannedGenres += states
 		toRemove = []
 		for genre in genres:
 			for ban in bannedGenres:
@@ -633,7 +684,7 @@ class scapebot():
 		for genre in toRemove:
 			genres.remove(genre)
 
-		rewords = {'Jazz-rock': 'Jazz Fusion', 'Hip\s?hop': 'Hip-hop', 'R[&amp;|n|&]b':'R&B', 'Electronic':'Electronica', 'Desert rock': 'Stoner rock'} # attention to detail is the most important part
+		rewords = {'Jazz-rock': 'Jazz Fusion', 'Hip\s?hop': 'Hip-hop', 'R[&amp;|n|&]b':'R&B', 'Desert rock': 'Stoner rock'} # attention to detail is the most important part
 
 		for i, n in enumerate(genres):
 			for repl in rewords:
@@ -642,7 +693,17 @@ class scapebot():
 			if bandname.lower() in n.lower() or len(n.split()) > 3: # second part dubbed the Gorge Mand rule, thank you Alina. "tags: [...], Kreayshawn can suck my clit, [...]"
 				genres.remove(n)
 		
-		replacements = {'West coast\s?': '', 'East coast\s?': ''}
+		lastResorts = ['Electronic', 'Electronica'] # electronic doesn't really mean shit but it can be a last resort. this usually leads scapebot to pick more interesting genres :)
+		remove = []
+		for i, n in enumerate(genres):		
+			for resort in lastResorts:
+				if re.search(resort, n, re.I):
+					remove.append(n)
+		for rem in remove:
+			if len(genres) > 1:
+				genres.remove(rem)
+
+		replacements = {'West coast\s?': '', 'East coast\s?': '', 'Alternative\s': 'Alt. '}
 		for i, n in enumerate(genres):
 			for repl in replacements:
 				r = re.search(repl, n, re.I)
@@ -661,9 +722,11 @@ class scapebot():
 		return genres
 
 
-
+	
 	def cleanGenresFinal(self, genres, wikiINFO):
-		
+	
+#	so this is a damn big function. it pretty much uses logic to pick the most interesting one or two genres from the batch
+
 	#	print genres
 
 		workingList = []
@@ -675,7 +738,8 @@ class scapebot():
 		for genre in genres:
 			genre_lower = genre.lower()
 			for word in genre_lower.split():
-				wordDict[word.lower()].append(genre)
+				if not re.search('indie', word, re.I):
+					wordDict[word.lower()].append(genre)
 		for word, occurrences in wordDict.iteritems():
 			if len(occurrences) > 1:
 				overlaps += occurrences				
@@ -687,17 +751,37 @@ class scapebot():
 			if overlaps.count(genre) > 1:
 				overlaps.remove(genre)
 
-	#	print 'working', workingList, 'rest', rest, 'overlaps', overlaps
+		print 'rest', rest, 'overlaps', overlaps
 		
 		done = False # we're just beginning!
 
-		# stage 1
-		if len(rest) == 0 and len(overlaps) != 0: # all the genres gathered are similar & probably redundant; use shortest one, be concise
-			workingList.append(min(overlaps, key=len))
-			done = True
+		# before we do anything, delete smaller parts of larger compounds. ex: delete Disco if we also have Italodisco. this way not only can we only use one but we are guaranteed to use the longer more interesting one
+	
+						
 
+
+
+		# stage 1
+		if len(rest) == 0 and len(overlaps) != 0: # all the genres gathered are similar so we have to be caferul not to be redundant
+			workingList.append(overlaps.pop(0))
+			firstGenre = workingList[0].split()
+			for i,n in enumerate(firstGenre):
+				firstGenre[i] = n.lower()
+			for genre in overlaps:
+				match = False
+				for word in genre.split():
+					if word.lower() in firstGenre: # these nested for-loops guarantee that the two genres don't share words. the point of the two genres showing up isn't necessarily maximum accuracy, it's inciting interest
+						match = True
+					for already in firstGenre:
+						print already, word
+						if re.search(word, already, re.I) or re.search(already, word, re.I): # compound words, yo. like don't say 'Disco' and 'Italodisco'
+							match = True
+				if not match and not done:
+					workingList.append(genre)
+					done = True
+					break
 		
-		
+		# stage 2
 		if not done:
 			if len(overlaps) != 0:
 				workingList.append(overlaps.pop(0))
@@ -710,13 +794,13 @@ class scapebot():
 			else:
 				source = max([overlaps, rest], key=len)
 				try:
-					workingList.append(source[int(len(source)/2)])
+					for bitty in source:
+						if not re.search(bitty, workingList[0], re.I) and not re.search(workingList[0], bitty, re.I):
+							workingList.append(bitty)
+							break
 				except:
 					pass
-
-
-
-
+	
 								
 		return workingList
 
@@ -733,12 +817,7 @@ class scapebot():
 		majorCities = { 'Seattle': 'Seattle', 'Boston': 'Boston', 'Los Angeles': 'LA', 'Portland': 'Portland', 'Providence': 'Providence', 'Long Beach, California': 'Long Beach', 'San Fransisco': 
 						'San Fransisco', 'Berkeley': 'Berkeley' }
 
-		# For identifying a state and cutting off anything after it
-		states = [ 'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 
-					'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 
-					'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
-					'West Virginia', 'Wisconsin', 'Wyoming' ]
-
+		
 		# No postal codes!
 		postalCodes = { 'WA': 'Washington', 'DE': 'Delaware', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'HI': 'Hawaii', 'FL': 'Florida', 'WY': 'Wyoming', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 
 						'TX': 'Texas', 'LA': 'Louisiana', 'NC': 'North Carolina', 'ND': 'North Dakota', 'NE': 'Nebraska', 'TN': 'Tennessee', 'NY': 'New York', 'PA': 'Pennsylvania', 'CA': 'California', 'NV': 'Nevada', 
