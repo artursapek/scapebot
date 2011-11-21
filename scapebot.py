@@ -187,6 +187,7 @@ class scapebot():
 		results = ''
 		sources = {}
 		newestAlbumName = None
+		originalInput = bandname
 		
 		# yes I'm a bastard
 
@@ -235,7 +236,7 @@ class scapebot():
 				link = li.div.h3.a
 				if re.search('wikipedia.org', link['href']):
 					soup = BeautifulSoup(br.open(link['href']).read())
-					if re.search(self.regexifyBandname(bandname), str(soup), flags=re.I) and len(soup.findAll('a', href='/wiki/Music_genre')) > 0 and re.search(self.regexifyBandname(bandname), soup.h1.renderContents(), re.I):
+					if re.search(self.regexifyBandname(bandname), str(soup), flags=re.I) and len(soup.findAll('a', href='/wiki/Music_genre')) > 0 and re.search(self.regexifyBandname(bandname), soup.h1.renderContents(), re.I) and '(soundtrack)' not in soup.h1.renderContents() and 'album)' not in soup.h1.renderContents():
 						sources['Wikipedia'] = str(link['href'])
 						break
 			except:
@@ -252,7 +253,8 @@ class scapebot():
 				if m:
 					URL = str(URL[:URL.find(m.group(0)) + 12])
 					soup = BeautifulSoup(br.open(URL).read())
-					if re.search(self.regexifyBandname(bandname), str(soup), flags=re.I) and re.search(self.regexifyBandname(bandname), str(soup), re.I):
+					byline = soup.findAll('span', attrs={'itemprop': 'byArtist'})[0]
+					if re.search(self.regexifyBandname(bandname), byline.renderContents(), flags=re.I): # the 'by' ensures that it's the artist's page, not a page that mentions them
 						sources['Bandcamp'] = URL
 						break
 			except:
@@ -315,7 +317,7 @@ class scapebot():
 
 			try:
 				#redefine bandname with formatting from wiki header, band names can be weird, number 1 trusted source for name formatting
-				bandname = soup.h1.renderContents().replace(' (musician)', '').replace(' (band)', '')			
+				bandname = soup.h1.renderContents().replace(' (musician)', '').replace(' (band)', '').replace(' (rock band)', '').replace('User:', '')		
 				nameFormatted = True # name formatting done, that was easy :)
 				originInfo = soup.findAll('th', text='Origin')[0].parent.parent.td
 				for link in originInfo('a'):
@@ -326,12 +328,7 @@ class scapebot():
 					citation.replaceWith('')
 				for linebreak in originInfo('br'):
 					linebreak.replaceWith('')
-				
-
 				origin = originInfo.renderContents()
-
-				
-
 				wikiINFO['Origin'] = origin
 
 			except:
@@ -444,6 +441,17 @@ class scapebot():
 					genres = soup[genreMeta + 29:]
 					genres = genres[:genres.index('">')]
 					genres = genres.split(', ')
+					toRemove = []
+					for genre in genres:
+						try:
+							genreSoup = br.open('http://last.fm/tag/' + genre.replace(' ', '%20')).read() # only keeps legit genres with tag pages
+							if re.search('a description for this tag yet', genreSoup):
+								toRemove.append(genre)
+						except:
+							pass
+					for genre in toRemove:
+						genres.remove(genre)
+					
 					if not nameFormatted:
 						nameMeta = soup.index('itemprop="name"')
 						bandname = soup[nameMeta + 16:]
@@ -456,9 +464,8 @@ class scapebot():
 					
 				except:
 					pass
-
+				
 				# origin
-
 				
 				try:
 				#	print 'origin from lastfm'
@@ -543,40 +550,50 @@ class scapebot():
 				pass
 
 		
-		
 
 				
 
 		if 'Bandcamp' in sources:
 			temp = []
+			tagsFound = None
 			bandcampINFO = {}
 			soup = BeautifulSoup(br.open(sources['Bandcamp'] + '/releases').read())
 			tags = soup.findAll('dd', attrs={ 'class' : 'tralbumData' })
 			if len(tags) > 0:
 				for tagsPossible in tags:
 					if 'tags:' in tagsPossible.renderContents():
-						tags = tagsPossible
+						tagsFound = tagsPossible
 						break
-				for a in tags('a'):
-					temp.append(a.renderContents())
-				x = 1
-				if temp[len(temp) - 1].split(' ')[0][0].isupper():
-					bandcampINFO['Origin'] = temp[len(temp) - 1]
-					x = 2
-				bandcampINFO['Genres'] = temp[:len(temp) - x]
-				GENRES += self.cleanGenres(bandcampINFO['Genres'], bandname)
-				# if we get bandcamp its often going to be the only source so let's milk it
-				if not nameFormatted:
-					namesection = soup.findAll('dl', attrs={ 'id' : 'name-section' })[0]
-					artistname = namesection.span
-					for a in artistname('a'):
-						a.replaceWith(a.renderContents())
-					bandname = artistname.renderContents().split()
-					# uncapitalized names are probably a result of negligence and not a creative choice if this is the only source of info for this band
-					for index, word in enumerate(bandname):
-						bandname[index] = string.capitalize(word)
-					bandname = ' '.join(bandname)
-					nameFormatted = True
+				if tagsFound:
+					for a in tagsFound('a'):
+						temp.append(a.renderContents())
+					x = 1
+					if temp[len(temp) - 1].split(' ')[0][0].isupper():
+						bandcampINFO['Origin'] = temp[len(temp) - 1]
+						x = 2
+					bandcampINFO['Genres'] = temp[:len(temp) - x]
+					GENRES += self.cleanGenres(bandcampINFO['Genres'], bandname)
+					# if we get bandcamp its often going to be the only source so let's milk it
+					if not nameFormatted:
+						namesection = soup.findAll('dl', attrs={ 'id' : 'name-section' })[0]
+						artistname = namesection.span
+						for a in artistname('a'):
+							a.replaceWith(a.renderContents())
+						bandname = artistname.renderContents().split()
+						# if all lowercase it's prob. negligence; capitalize. if any letters capital, then theyve formatted it and we'll leave it how it is. ex: avi buffalo => Avi Buffalo; tUnE-yArDs, Earl Sweatshirt, IDOLS left alone
+						changeIt = True
+						for index, word in enumerate(bandname):
+							if not changeIt: break
+							for char in word:
+								if char.isupper():
+									changeIt = False
+									break
+						if changeIt:
+							for index, word in enumerate(bandname):
+								bandname[index] = string.capitalize(word)
+						bandname = ' '.join(bandname)
+						nameFormatted = True
+						
 			
 			
 		if not nameFormatted: # if we haven't found out how to format the name, default to proper grammar
@@ -591,7 +608,7 @@ class scapebot():
 			bandname = '-'.join(bandname)
 			nameFormatted = True
 
-		INFO = [self.cleanBandname(bandname),'','','']
+		INFO = [self.cleanBandname(bandname, originalInput),'','','']
 
 		temp = []
 
@@ -610,9 +627,9 @@ class scapebot():
 
 
 		try:
-			INFO[1] = self.cleanGenresFinal(GENRES, wikiINFO)
+			INFO[1] = self.chooseGenres(GENRES)
 		except:
-			INFO[1] = self.cleanGenresFinal(GENRES, {})
+			INFO[1] = self.chooseGenres(GENRES, {})
 
 		if 'Wikipedia' in sources:
 			try:
@@ -667,23 +684,35 @@ class scapebot():
 	
 	
 
-	def cleanBandname(self, name):
+	def cleanBandname(self, name, original):
+		alternatives = name.split('/') # there's been an instance where wikipedia gives an old name/new name combo. in this case just go with what they're going by now
+		if len(alternatives) > 1:
+			for piece in alternatives:
+				if re.search(original, piece, re.I):
+					name = string.capitalize(piece)
 		return name.replace('&amp;', '&')
 
-	def cleanGenres(self, genres, bandname): # standardize the likely spam-filled list of genres collected from all sources into a meaningful pair which will be displayed
-		# remove
-	#	print genres
+	def cleanGenres(self, genres, bandname): # standardize the likely spam-filled list of genres collected from all sources into a meaningful pair which will be displayed on the page
 		bannedGenres = ['Experimental', 'Other', 'Vocalist', 'Prog', 'Hard Rock' ,'New\sYork', 'Boston', 'Seattle', 'Canad', 'Post[ -]', 'Singer[ -]Songwriter', 
-						'Ambient', 'Underground', 'Scotland', 'ish', 'Freestyle', 'Good music'] # "All music is experimental." - Partick Leonard
+						'Ambient', 'Underground', 'Scotland', 'ish', 'Freestyle', 'Good music', 'Regional mexican'] # "All music is experimental." - Partick Leonard
 		bannedGenres += states
 		toRemove = []
+
+		# remove any HTML tags that may have made it through
+		for ind, genre in enumerate(genres):
+			genre = BeautifulSoup(genre)
+			for tag in genre(True):
+				tag.replaceWith(tag.renderContents())
+			genres[ind] = str(genre)
+
+		# remove bad genres
 		for genre in genres:
 			for ban in bannedGenres:
-				if re.search(ban, genre, re.I):
-					toRemove.append(genre) # this proxy is required
+				if re.search(ban, genre, re.I) or genre == '':
+					toRemove.append(genre) # this proxy is required as Zorah exhibited in her Google interview
 		for genre in toRemove:
 			genres.remove(genre)
-
+		
 		rewords = {'Jazz-rock': 'Jazz Fusion', 'Hip\s?hop': 'Hip-hop', 'R[&amp;|n|&]b':'R&B', 'Desert rock': 'Stoner rock'} # attention to detail is the most important part
 
 		for i, n in enumerate(genres):
@@ -693,17 +722,20 @@ class scapebot():
 			if bandname.lower() in n.lower() or len(n.split()) > 3: # second part dubbed the Gorge Mand rule, thank you Alina. "tags: [...], Kreayshawn can suck my clit, [...]"
 				genres.remove(n)
 		
+
 		lastResorts = ['Electronic', 'Electronica'] # electronic doesn't really mean shit but it can be a last resort. this usually leads scapebot to pick more interesting genres :)
 		remove = []
 		for i, n in enumerate(genres):		
 			for resort in lastResorts:
 				if re.search(resort, n, re.I):
-					remove.append(n)
+					if n not in remove: # sometimes it adds in dupes without this
+						remove.append(n)
+
 		for rem in remove:
 			if len(genres) > 1:
 				genres.remove(rem)
 
-		replacements = {'West coast\s?': '', 'East coast\s?': '', 'Alternative\s': 'Alt. '}
+		replacements = {'West coast\s?': '', 'East coast\s?': '', 'Alternative\s': 'Alt. ', ' revival': ''}
 		for i, n in enumerate(genres):
 			for repl in replacements:
 				r = re.search(repl, n, re.I)
@@ -723,17 +755,11 @@ class scapebot():
 
 
 	
-	def cleanGenresFinal(self, genres, wikiINFO):
-	
-#	so this is a damn big function. it pretty much uses logic to pick the most interesting one or two genres from the batch
-
-	#	print genres
-
+	def chooseGenres(self, genres):
 		workingList = []
-
 		overlaps = []
 
-		# get rid of redundancy, choose more descriptive/unique phrases over lesser ones
+		# stage 0: get rid of redundancy, choose more descriptive/unique phrases over lesser ones
 		wordDict = defaultdict(list)
 		for genre in genres:
 			genre_lower = genre.lower()
@@ -753,15 +779,9 @@ class scapebot():
 
 		print 'rest', rest, 'overlaps', overlaps
 		
-		done = False # we're just beginning!
+		done = False
 
-		# before we do anything, delete smaller parts of larger compounds. ex: delete Disco if we also have Italodisco. this way not only can we only use one but we are guaranteed to use the longer more interesting one
-	
-						
-
-
-
-		# stage 1
+		# stage 1: 
 		if len(rest) == 0 and len(overlaps) != 0: # all the genres gathered are similar so we have to be caferul not to be redundant
 			workingList.append(overlaps.pop(0))
 			firstGenre = workingList[0].split()
@@ -773,7 +793,6 @@ class scapebot():
 					if word.lower() in firstGenre: # these nested for-loops guarantee that the two genres don't share words. the point of the two genres showing up isn't necessarily maximum accuracy, it's inciting interest
 						match = True
 					for already in firstGenre:
-						print already, word
 						if re.search(word, already, re.I) or re.search(already, word, re.I): # compound words, yo. like don't say 'Disco' and 'Italodisco'
 							match = True
 				if not match and not done:
@@ -815,8 +834,7 @@ class scapebot():
 
 		# Call these cities just by their name or nickname, everyone knows them
 		majorCities = { 'Seattle': 'Seattle', 'Boston': 'Boston', 'Los Angeles': 'LA', 'Portland': 'Portland', 'Providence': 'Providence', 'Long Beach, California': 'Long Beach', 'San Fransisco': 
-						'San Fransisco', 'Berkeley': 'Berkeley' }
-
+						'San Fransisco', 'Berkeley': 'Berkeley', 'Brooklyn': 'Brooklyn', 'Long Island': 'Long Island', 'Minneapolis': 'Minneapolis' }
 		
 		# No postal codes!
 		postalCodes = { 'WA': 'Washington', 'DE': 'Delaware', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'HI': 'Hawaii', 'FL': 'Florida', 'WY': 'Wyoming', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 
@@ -827,7 +845,7 @@ class scapebot():
 
 		# Don't both specifying states of major cities
 		for city in majorCities:
-			if city in origin:
+			if re.search(city, origin, re.I):
 				origin = majorCities[city]
 				nickname = True
 
