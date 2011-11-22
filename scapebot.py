@@ -11,7 +11,7 @@ from collections import defaultdict
 import csv
 import string
 import re
-import unicodedata
+import os
 #from PIL import Image
 
 
@@ -42,12 +42,13 @@ class scapebot():
 			0xf2:'o', 0xf3:'o', 0xf4:'o', 0xf5:'o', 0xf6:'o', 0xf8:'o',
 			0xf9:'u', 0xfa:'u', 0xfb:'u', 0xfc:'u',
 			0xfd:'y', 0xfe:'th', 0xff:'y',
-			0xa1:'!'	}
+			0xa1:'!' }
 		global states
-		states = [ 'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 
-					'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 
-					'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
-					'West Virginia', 'Wisconsin', 'Wyoming' ]
+		states = [ 
+			'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 
+			'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 
+			'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+			'West Virginia', 'Wisconsin', 'Wyoming' ]
 
 
 	def sanitize(self, x): #clean up names which are often not spelled consistently
@@ -79,15 +80,11 @@ class scapebot():
 				show.insert(0, ID)
 			#	print show
 				writer.writerow(tuple(show))
-
 			
 		file.close()
 
 	def research(self):
-		try:
-			nameInput = raw_input('> ')
-		except:
-			pass
+		nameInput = raw_input('> ')
 		try:	
 			if nameInput != 'exit':
 				print self.researchBand(nameInput)
@@ -174,6 +171,50 @@ class scapebot():
 				r += i
 		
 		return str(r)
+	
+	def bandAlreadyScraped(self, bandname):
+		db = open('bandsScraped.txt', 'rb')
+		lines = db.readlines()
+		if bandname not in lines:
+			db.close()
+			db = open('bandsScraped.txt', 'a')
+			db.write('\n' + bandname)
+			db.close()
+			x = False
+		else:
+			x = True
+		return x
+
+
+	# keeps a db of legit genres from Wikipedia and Last.fm, and a count of their appearance, to pick out realistic ones from bandcamp/myspace/other user-edited sources
+	def genresDB(self, genres, bandname):
+		if not self.bandAlreadyScraped(bandname):
+			toAdd = []
+			db = open('genres.csv', 'rb')
+			temp = open('temp.csv', 'wb')
+			reader = csv.reader(db)
+			writer = csv.writer(temp)
+			db.seek(0)
+			for line in reader:
+				if line[0] in genres:
+					writer.writerow((line[0], str(int(line[1]) + 1)))
+					genres.remove(line[0])
+				else:
+					writer.writerow(line)
+			for genre in genres:
+				writer.writerow((genre, 1))
+			db.close()
+			temp.close()
+			with open('temp.csv', 'rb') as temp:
+				lines = temp.readlines()
+			with open('genres.csv', 'wb') as genres:
+				genres.writelines(lines)
+			temp.close()
+			genres.close()
+			os.remove('temp.csv')
+
+
+		
 
 	# huge function: researchBand
 	# input: band name
@@ -184,10 +225,12 @@ class scapebot():
 		# set some quality-assurance variables :) <3
 		nameFormatted = False
 		GENRES = []
+		TRUSTWORTHY_GENRES = []
 		results = ''
 		sources = {}
 		newestAlbumName = None
 		originalInput = bandname
+
 		
 		# yes I'm a bastard
 
@@ -274,7 +317,7 @@ class scapebot():
 				#print li.a.renderContents() 
 				link = li.div.h3.a
 				#print link.renderContents()
-				knownSources = {'Last.fm': 'last.fm/music', 'Soundcloud': 'soundcloud.com'}
+				knownSources = {'Last.fm': 'last.fm/music', 'Soundcloud': 'soundcloud.com', 'ReverbNation': 'reverbnation.com'}
 				for entry in knownSources:
 					try:
 						temp = link['href'].index(knownSources[entry])
@@ -360,9 +403,11 @@ class scapebot():
 					
 				genres = self.cleanGenres(genres, bandname)
 
+				
 				wikiINFO['Genre'] = genres	
 				
 				GENRES += genres
+				TRUSTWORTHY_GENRES += genres
 
 			#	print 'WIKI genres', genres
 				
@@ -417,24 +462,18 @@ class scapebot():
 							if newest.i:
 								if newest.i.a: newestAlbumName = newest.i.a.renderContents()
 								else: newestAlbumName = newest.i.renderContents()
-				print newestAlbumName			
+				if newestAlbumName != 'None':
+					print newestAlbumName			
 			except:
 				pass
 
-
-
-
-
-
 		if 'Last.fm' in sources:
-			
 
 			try:
 				#scrape last.fm
 				lastfmINFO = {}
 				soup = BeautifulSoup(br.open(sources['Last.fm']).read())
 			#	print 'last.fm'
-				
 				try:
 					soup = str(soup)
 					genreMeta = soup.index('itemprop="keywords"') # this is a hack, cos for some reason BeauSoup doesnt find itemprop attrs
@@ -461,6 +500,13 @@ class scapebot():
 						
 					# sometimes last.fm will have a band/musician's own name as a tag
 					genres = self.cleanGenres(genres, bandname)
+
+					GENRES += genres					
+
+					TRUSTWORTHY_GENRES += genres
+						
+	
+					
 					
 				except:
 					pass
@@ -489,7 +535,6 @@ class scapebot():
 				if locality != '</strong>':
 					lastfmINFO['Origin'] = locality
 
-				GENRES += genres
 
 			except:
 				pass
@@ -508,6 +553,7 @@ class scapebot():
 				if genre.renderContents() not in soundcloudINFO['Genres']:
 					soundcloudINFO['Genres'].append(genre.renderContents())
 			soundcloudINFO['Genres'] = self.cleanGenres(soundcloudINFO['Genres'], bandname)
+
 			GENRES += soundcloudINFO['Genres']
 			
 			# name (if no Wiki which is likely for bands with soundclouds)
@@ -536,6 +582,9 @@ class scapebot():
 					tag.replaceWith(tag.renderContents())
 				target = target.renderContents()[8:]
 				genres = self.cleanGenres(target.split(' / '), bandname)
+
+				TRUSTWORTHY_GENRES += genres
+
 			#	print 'MYSPACE genres', genres
 				GENRES += genres
 				myspaceINFO['Genres'] = genres
@@ -610,21 +659,9 @@ class scapebot():
 
 		INFO = [self.cleanBandname(bandname, originalInput),'','','']
 
-		temp = []
-
-		for genre in GENRES:
-			# remove vague BS
-			if genre not in ['Rock', 'Alternative', 'Indie']: 
-				temp.append(genre)
-
-		# migrate descriptive genres, abandon the rest
-
-		GENRES = temp
-
 		for genre in GENRES:
 			if GENRES.count(genre) > 1:
 				GENRES.remove(genre)
-
 
 		try:
 			INFO[1] = self.chooseGenres(GENRES)
@@ -664,6 +701,20 @@ class scapebot():
 		positions = {'Genre':1,'Origin':2,'Albumsrc':3}
 		genre_alternative = False
 		
+		t_g = TRUSTWORTHY_GENRES
+
+		toRemove = []
+
+		if len(TRUSTWORTHY_GENRES) > 0:
+			t_g.sort()
+			for ind, genre in enumerate(t_g):
+				if t_g[ind - 1] == genre:
+					toRemove.append(genre)
+		
+		for genre in toRemove:
+			t_g.remove(genre)
+		
+		self.genresDB(t_g, bandname)
 
 		# quality control
 		
@@ -681,6 +732,8 @@ class scapebot():
 			return INFO
 		else:
 			return 'Not found'
+
+		
 	
 	
 
@@ -694,7 +747,7 @@ class scapebot():
 
 	def cleanGenres(self, genres, bandname): # standardize the likely spam-filled list of genres collected from all sources into a meaningful pair which will be displayed on the page
 		bannedGenres = ['Experimental', 'Other', 'Vocalist', 'Prog', 'Hard Rock' ,'New\sYork', 'Boston', 'Seattle', 'Canad', 'Post[ -]', 'Singer[ -]Songwriter', 
-						'Ambient', 'Underground', 'Scotland', 'ish', 'Freestyle', 'Good music', 'Regional mexican'] # "All music is experimental." - Partick Leonard
+						'Ambient', 'Underground', 'Scotland', 'ish', 'Freestyle', 'Good music', 'Regional mexican', 'Indie', 'Alternative', 'Chicago', 'Swag', 'Denton', 'Communication'] # "All music is experimental." - Partick Leonard
 		bannedGenres += states
 		toRemove = []
 
@@ -819,7 +872,15 @@ class scapebot():
 							break
 				except:
 					pass
-	
+		
+		# replacements that wont fuck with how things are chosen
+		finalReplacements = {'Alt-':'Alt. '}
+		for i, n in enumerate(workingList):
+			for repl in finalReplacements:
+				if repl in n:
+					workingList[i] = workingList[i].replace(repl, finalReplacements[repl])
+
+
 								
 		return workingList
 
@@ -834,7 +895,7 @@ class scapebot():
 
 		# Call these cities just by their name or nickname, everyone knows them
 		majorCities = { 'Seattle': 'Seattle', 'Boston': 'Boston', 'Los Angeles': 'LA', 'Portland': 'Portland', 'Providence': 'Providence', 'Long Beach, California': 'Long Beach', 'San Fransisco': 
-						'San Fransisco', 'Berkeley': 'Berkeley', 'Brooklyn': 'Brooklyn', 'Long Island': 'Long Island', 'Minneapolis': 'Minneapolis' }
+						'San Fransisco', 'Berkeley': 'Berkeley', 'Brooklyn': 'Brooklyn', 'Long Island': 'Long Island', 'Minneapolis': 'Minneapolis', 'Coney Island': 'Coney Island'}
 		
 		# No postal codes!
 		postalCodes = { 'WA': 'Washington', 'DE': 'Delaware', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'HI': 'Hawaii', 'FL': 'Florida', 'WY': 'Wyoming', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 
