@@ -24,8 +24,8 @@ class scapebot():
 		months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 		global monthsabbr 
 		monthsabbr = ['Jan', 'Feb', 'Mar', 'April', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-		global asciiMatches
-		asciiMatches = {
+		global unicode_to_text_Matches
+		unicode_to_text_Matches  = {
 			0xc0:'A', 0xc1:'A', 0xc2:'A', 0xc3:'A', 0xc4:'A', 0xc5:'A',
 			0xc6:'Ae', 0xc7:'C',
 			0xc8:'E', 0xc9:'E', 0xca:'E', 0xcb:'E',
@@ -43,6 +43,14 @@ class scapebot():
 			0xf9:'u', 0xfa:'u', 0xfb:'u', 0xfc:'u',
 			0xfd:'y', 0xfe:'th', 0xff:'y',
 			0xa1:'!' }
+		global text_to_unicode_Matches
+		text_to_unicode_Matches = { 'ae': ['230'], 'Th': ['208'], '!': ['161'], 'th': ['222', '240', '254'], 'A': ['192', '193', '194', '195', '196', '197'], 'C': ['199'], 'E': ['200', '201', '202', '203'], 
+									'I': ['204', '205', '206', '207'], 'O': ['210', '211', '212', '213', '214', '216'], 'N': ['209'], 'U': ['217', '218', '219', '220'], 'Y': ['221'],
+									'e': ['232', '233', '234', '235'], 'a': ['224', '225', '226', '227', '228', '229'], 'c': ['231'], 'Ae': ['198'], 'i': ['236', '237', '238', '239'],
+									'o': ['242', '243', '244', '245', '246', '248'], 'n': ['241'], 'ss': ['223'], 'u': ['249', '250', '251', '252'], 'y': ['253', '255'] }
+		
+
+
 		global states
 		states = [ 
 			'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 
@@ -60,6 +68,9 @@ class scapebot():
 	def command(self):    # Commandline interpreter
 		userinput = raw_input('> ')
 		self.Comet_Tavern(userinput)
+
+	def stripofASCII(self, string):
+		pass
 
 	def scrapeComet(self):
 		file = open('shows.csv', 'rb')
@@ -161,16 +172,21 @@ class scapebot():
 	def regexifyBandname(self, bandname):
 		
 		bandname = bandname.replace(' ', '[-,]?\s?').replace('&', 'and|&').replace('and', 'and|&').replace('DJ ', '(DJ\s)?').replace('dj ', '(dj\s)?')
-		r = ''
+		r = u''
 		for i in bandname:
-			if asciiMatches.has_key(ord(i)):
-				r += asciiMatches[ord(i)]
+			if unicode_to_text_Matches.has_key(ord(i)):
+				r += '[' + unicode_to_text_Matches[ord(i)] + i + ']'
+			if text_to_unicode_Matches.has_key(i):
+				r += '[' + i 
+				for val in text_to_unicode_Matches[i]:
+					r += unichr( int(val) )
+				r += ']'
 			elif ord(i) >= 0x80:
 				pass
 			else:
 				r += i
 		
-		return str(r)
+		return r
 	
 	def bandAlreadyScraped(self, bandname):
 		db = open('bandsScraped.txt', 'rb')
@@ -207,6 +223,7 @@ class scapebot():
 			temp.close()
 			with open('temp.csv', 'rb') as temp:
 				lines = temp.readlines()
+				lines.sort()
 			with open('genres.csv', 'wb') as genres:
 				genres.writelines(lines)
 			temp.close()
@@ -1254,6 +1271,7 @@ class scapebot():
 
 		if action[0] == "search":
 			isSearchForm = lambda l: l.action == 'http://mobile.twitter.com/searches'
+			returnTweets = []
 			br.select_form(predicate=isSearchForm)
 			br['search[query]'] = action[1]
 			results = br.submit().read()
@@ -1269,8 +1287,8 @@ class scapebot():
 						tag.replaceWith(hashtag)
 				message = message_soup
 				tweetContents = '@%s %s' % (sender, message)
-				return tweetContents
-
+				returnTweets.append(tweetContents)
+			return returnTweets	
 
 	def tweet(self, tweet):
 		self.twitter(['tweet', tweet])
