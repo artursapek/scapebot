@@ -156,9 +156,10 @@ class scapebot():
 
     def regexifyBandname(self, bandname):
         # regexes for flexibility
-        change = {'-':'[-,]?\s?','\s&\s':'\sand\s|\s&\s','\sand\s':'\sand\s|\s&\s','DJ ':'(DJ\s)?','dj ':'(dj\s)?'}
+        change = {'-':'[-,]?\s?',' & ':'\sand\s|\s&\s',' and ':'\sand\s|\s&\s','DJ ':'(DJ\s)?','dj ':'(dj\s)?'}
         for c in change:
-            bandname = bandname.replace(c, change[c])
+            if c == '\s&\s':
+                bandname = bandname.replace(c, change[c])
         r = u''
         for i in bandname: # take care of unicode chars. shitty metal bands often use special characters to look hardcore
             if unicode_to_text_Matches.has_key(ord(i)):
