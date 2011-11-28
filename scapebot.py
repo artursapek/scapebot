@@ -75,9 +75,12 @@ class scapebot():
 
     def research(self):
         nameInput = raw_input('> ')
+        local = raw_input('local? ')
         try:    
             if nameInput != 'exit':
-                print self.researchBand(nameInput)
+                if local == 'y': L = True
+                else: L = False
+                print self.researchBand(nameInput, L)
                 self.research()
             else:
                 pass
@@ -891,11 +894,8 @@ class scapebot():
 
     # Standardize the formatting and verunacular in the origin field. City and state if city is not famous, no postal codes or 'United States'
     def cleanOrigin(self, origin, bandname):
-
-        
-        
-
-        # For keeping track of shit
+ 
+         # For keeping track of shit
         nickname = False
 
         # Call these cities just by their name or nickname, everyone knows them
@@ -909,17 +909,34 @@ class scapebot():
                     'North Dakota': 'ND', 'Pennsylvania': 'PA', 'Florida': 'FL', 'Hawaii': 'HI', 'Kentucky': 'KY', 'Rhode Island': 'RI', 'Nebraska': 'NE', 'Missouri': 'MO', 'Ohio': 'OH', 'Alabama': 'AL', 
                     'South Dakota': 'SD', 'Colorado': 'CO', 'New Jersey': 'NJ', 'Washington': 'WA', 'North Carolina': 'NC', 'New York': 'NY', 'Montana': 'MT', 'Nevada': 'NV', 'Delaware': 'DE', 'Maine': 'ME' }
 
-        stateInd = 0
-        origin = origin.split(',')
+        stateInd = -1
+
+        if origin.find(', ') == -1:
+            origin = origin.replace(' ', ', ')
+
+        origin = origin.split(', ')
+
+        toRemove = []
+
         for i, p in enumerate(origin):
-            if p.strip() in states:
-                p.replace(p.strip(), states[p.strip()])
+            s = string.capitalize(p.strip()) 
+            if s in states:
+                origin[i] = states[s]
                 stateInd = i
-        if stateInd > 0:
-            for i in range(stateInd, len(origin) - 1):
-                origin.pop(i)
+
+        if toRemove: origin.remove(toRemove[0])
+
         
-        origin = ','.join(origin)
+
+        if stateInd > 0:
+            for i in range(stateInd + 1, len(origin) - 1):
+                print origin[i]
+                origin.pop(i)
+
+        origin[i] = origin[i].upper()
+
+
+        origin = ', '.join(origin)
         
     
 
@@ -933,10 +950,7 @@ class scapebot():
         if not nickname:
         
             # Cut off after state name
-            for state in states:
-                if state.lower() in origin.lower():
-                    origin = origin[:origin.lower().index(state.lower()) + len(state)]
-            
+                        
             # Remove regions, western, eastern, etc
             for region in ['western', 'eastern', 'northern', 'southern']:
                 r = re.search(region + '\s', origin, re.I)
@@ -948,21 +962,20 @@ class scapebot():
             temp = re.search(regexbandname, origin, re.I)
             if temp:
                 origin = origin.replace(origin[origin.find(temp.group(0)):len(temp.group(0))], '')
-
-
-            origin = origin.split(', ')
             
+            origin = origin.split(', ')
             for index,word in enumerate(origin):
-                origin[index] = string.capitalize(word)
+                if index != stateInd:
+                    origin[index] = string.capwords(word)
             origin = ', '.join(origin)
 
-            origin = origin.split(' ')
-            
-            for index,word in enumerate(origin):
-                origin[index] = string.capitalize(word)
-            origin = ' '.join(origin)
-
-            
+            r = re.search(',?\s?u.?[sn].?\s?', origin, re.I)
+            print r
+            if r: origin = origin.replace(r.group(0), '')
+            r = re.search(', Please Select Your Region', origin, re.I)
+            print r
+            if r: origin = origin.replace(r.group(0), '')
+                    
 
 
         return origin
