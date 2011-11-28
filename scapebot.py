@@ -156,7 +156,7 @@ class scapebot():
 
     def regexifyBandname(self, bandname):
         # regexes for flexibility
-        change = {'-':'[-,]?\s?','&':'and|&','and':'and|&','DJ ':'(DJ\s)?','dj ':'(dj\s)?'}
+        change = {'-':'[-,]?\s?','\s&\s':'\sand\s|\s&\s','\sand\s':'\sand\s|\s&\s','DJ ':'(DJ\s)?','dj ':'(dj\s)?'}
         for c in change:
             bandname = bandname.replace(c, change[c])
         r = u''
@@ -293,11 +293,12 @@ class scapebot():
 
         # search for bandcamp
 
-        bandcamp_results = self.Google('%s bandcamp' % bandname)
+        bandcamp_results = self.Google('%s bandcamp' % query)
         for li in bandcamp_results('li'):
             try:
                 link = li.div.h3.a
                 URL = link['href']
+                print URL
                 m = re.search('bandcamp.com', URL) # this extra step makes sure we don't end up with the root URL of someone who mentions the bandname in a song title or some shit
                 if m:
                     URL = str(URL[:URL.find(m.group(0)) + 12])
@@ -307,8 +308,9 @@ class scapebot():
                     byline = soup.findAll('span', attrs={'itemprop': 'byArtist'})[0]
                     for a in byline('a'):
                         a.replaceWith(a.renderContents())
-                    r = re.search(self.regexifyBandname(bandname) + '[^\w]', byline.renderContents(), flags=re.I)
-                    bl = str(byline.renderContents()).replace('\n', '')
+
+                    bl = str(byline.renderContents()).replace('\n', '').strip()
+                    r = re.search(self.regexifyBandname(bandname), bl, flags=re.I)
                     bl = bl[bl.find(r.group(0)):].split()
                     if r and len(bandname.split()) == len(bl): # checks for other words or compound words
                         sources['Bandcamp'] = URL
@@ -627,7 +629,12 @@ class scapebot():
             reverbnationINFO['Origin'] = parts[1].strip().replace('\r', '')
             reverbnationINFO['Genres'] = parts[3].strip().replace('\r', '').split(' / ')
             GENRES += reverbnationINFO['Genres']
-            
+        
+
+        if 'Facebook' in sources:
+            facebookINFO = {}
+            soup = BeautifulSoup(br.open(sources['Facebook'] + '?sk=info').read())
+
 
 
                 
