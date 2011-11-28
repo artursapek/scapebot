@@ -94,7 +94,7 @@ class scapebot():
 
     # hangs up on Facebook pages
 
-    def checkBand(self, bandname): # checks if a band exists in the db, if not this will redirect to research band
+    def checkBand(self, bandname, forceLocal = False): # checks if a band exists in the db, if not this will redirect to research band
         file = open('bands.csv', 'rb')
         ID = int(len(file.readlines()))
         file.seek(0)
@@ -218,7 +218,7 @@ class scapebot():
     # output: [band name formatted, [one or two genres], band's origin (city/state), album cover source local]
     # called in scraping function for each band in show that's not already in db
 
-    def researchBand(self, bandname):
+    def researchBand(self, bandname, forceLocal = False):
         # set some quality-assurance variables :) <3
         nameFormatted = False
         GENRES = []
@@ -256,7 +256,9 @@ class scapebot():
 
         # find Myspace
         
-        myspaceMusic_results = self.Google('%s music myspace' % bandname)
+        query = bandname
+        if forceLocal: query += ' Seattle'
+        myspaceMusic_results = self.Google('%s music myspace' % query)
         for li in myspaceMusic_results('li'):
             try:
                 link = li.div.h3.a
@@ -277,7 +279,7 @@ class scapebot():
                 if re.search('wikipedia.org', link['href']):
                     soup = BeautifulSoup(br.open(link['href']).read())
                     header = soup.h1.renderContents()
-                    if header.find('(song)') == -1 and re.search(self.regexifyBandname(bandname), str(soup), flags=re.I) and len(soup.findAll('a', href='/wiki/Music_genre')) > 0 and re.search(self.regexifyBandname(bandname), soup.h1.renderContents(), re.I) and '(soundtrack)' not in soup.h1.renderContents() and 'album)' not in soup.h1.renderContents():
+                    if header.find('song)') == -1 and re.search(self.regexifyBandname(bandname), str(soup), flags=re.I) and len(soup.findAll('a', href='/wiki/Music_genre')) > 0 and re.search(self.regexifyBandname(bandname), soup.h1.renderContents(), re.I) and '(soundtrack)' not in soup.h1.renderContents() and 'album)' not in soup.h1.renderContents():
                         sources['Wikipedia'] = str(link['href'])
                         break
             except:
@@ -754,8 +756,8 @@ class scapebot():
 
     def cleanGenres(self, genres, bandname): # standardize the likely spam-filled list of genres collected from all sources into a meaningful pair which will be displayed on the page
         bannedGenres = ['Experimental', 'Other', 'Vocalist', 'Prog', 'Hard Rock' ,'New\sYork', 'Boston', 'Seattle', 'Canad', 'Post[ -]', 'Singer[ -]Songwriter', 
-                        'Ambient', 'Underground', 'Scotland', 'ish', 'Freestyle', 'Good music', 'Regional mexican', 'Alternative', 'Chicago', 'Swag', 'Denton', 'Communication', 
-                        'Minimalist', 'Australian', '80', '70', 'Music'] # "All music is experimental." - Partick Leonard
+                        'Ambient', 'Underground', 'Scotland', 'ish', 'Freestyle', 'Good music', 'Regional mexican', 'Chicago', 'Swag', 'Denton', 'Communication', 
+                        'Minimalist', 'Australian', '80', '70', 'Music', 'Song'] # "All music is experimental." - Partick Leonard
         bannedGenres += states
         toRemove = []
 
@@ -808,7 +810,7 @@ class scapebot():
         overlaps = []
         done = False
 
-        lastResorts = ['Electronic', 'Electronica', 'Indie', 'Rock'] # prefer to remove genres that don't really mean shit but they can be a last resort. this usually leads scapebot to pick more interesting genres :)
+        lastResorts = ['Electronic', 'Electronica', 'Indie', 'Rock', 'Alternative'] # prefer to remove genres that don't really mean shit but they can be a last resort. this usually leads scapebot to pick more interesting genres :)
         remove = []
         for i, n in enumerate(genres):      
             for resort in lastResorts:
@@ -842,8 +844,9 @@ class scapebot():
         
 
         # stage 1: 
-        if len(rest) == 0 and len(overlaps) != 0: # all the genres gathered are similar so we have to be careful not to be redundant
+        if overlaps:
             best = max(overlaps, key=lambda x: len(x) / len(x.split()))
+        if len(rest) == 0 and len(overlaps) != 0: # all the genres gathered are similar so we have to be careful not to be redundant
             workingList.append(best)
             overlaps.remove(best)
             firstGenre = workingList[0]
@@ -862,8 +865,11 @@ class scapebot():
         if not done:
             if rest:
                 workingList.append(rest.pop(0))
-            elif overlaps:
-                workingList.append(overlaps.pop(0))
+                if overlaps:
+                    workingList.append(best)
+                elif rest:
+                    workingList.append(rest.pop(0))
+            
             
 
         # replacements that wont fuck with how things are chosen
