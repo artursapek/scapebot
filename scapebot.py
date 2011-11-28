@@ -80,7 +80,10 @@ class scapebot():
             if nameInput != 'exit':
                 if local == 'y': L = True
                 else: L = False
-                print self.researchBand(nameInput, L)
+                try:
+                    print self.researchBand(nameInput, L)
+                except:
+                    print 'Crashed; not found'
                 self.research()
             else:
                 pass
@@ -315,7 +318,9 @@ class scapebot():
 
 
         # google the band
-        results = self.Google(bandname)
+
+
+        results = self.Google(query)
 
 
         for li in results('li'):
@@ -327,7 +332,7 @@ class scapebot():
                 #print li.a.renderContents() 
                 link = li.div.h3.a
                 #print link.renderContents()
-                knownSources = {'Last.fm': 'last.fm/music', 'Soundcloud': 'soundcloud.com', 'ReverbNation': 'reverbnation.com'}
+                knownSources = {'Last.fm': 'last.fm/music', 'Soundcloud': 'soundcloud.com', 'ReverbNation': 'reverbnation.com', 'Facebook': 'faceboom.com'}
                 for entry in knownSources:
                     try:
                         temp = link['href'].index(knownSources[entry])
@@ -612,7 +617,18 @@ class scapebot():
             except:
                 pass
 
-        
+        if 'ReverbNation' in sources:
+            reverbnationINFO = {}
+            soup = BeautifulSoup(br.open(sources['ReverbNation']).read())
+            # so reverb nation all-capses all artist names for some fucking reason. if this is the only source we'll just string.capwords it get genres and origin tho
+            info = soup.findAll('div', attrs={ 'class' : 'location_genres' })[0].renderContents() # all we need
+            parts = info.split('\n')
+            print parts
+            reverbnationINFO['Origin'] = parts[1].strip().replace('\r', '')
+            reverbnationINFO['Genres'] = parts[3].strip().replace('\r', '').split(' / ')
+            GENRES += reverbnationINFO['Genres']
+            
+
 
                 
 
@@ -704,6 +720,12 @@ class scapebot():
                 INFO[2] = self.cleanOrigin(myspaceINFO['Origin'], bandname)
             except:
                 pass
+        if INFO[2] == '' and reverbnationINFO:
+            try:
+                INFO[2] = self.cleanOrigin(reverbnationINFO['Origin'], bandname)
+            except:
+                pass
+
 
 
                 
@@ -864,7 +886,7 @@ class scapebot():
                     workingList.append(genre)
                     done = True
                     break
-        # stage 2
+        # stage 2: we have shit to work with so let's work with it
         if not done:
             if rest:
                 workingList.append(rest.pop(0))
