@@ -100,7 +100,7 @@ class scapebot():
 
     # hangs up on Facebook pages
 
-    def checkBand(self, bandname, forceLocal = False): # checks if a band exists in the db, if not this will redirect to research band
+    def checkBand(self, bandname): # checks if a band exists in the db, if not this will redirect to research band
         file = open('bands.csv', 'rb')
         ID = int(len(file.readlines()))
         file.seek(0)
@@ -156,10 +156,9 @@ class scapebot():
 
     def regexifyBandname(self, bandname):
         # regexes for flexibility
-        change = {'-':'[-,]?\s?',' & ':'\sand\s|\s&\s',' and ':'\sand\s|\s&\s','DJ ':'(DJ\s)?','dj ':'(dj\s)?'}
+        change = {' ':'[-\s,]?', ' & ':'\sand\s|\s&\s',' and ':'\sand\s|\s&\s','DJ ':'(DJ\s)?','dj ':'(dj\s)?'}
         for c in change:
-            if c == '\s&\s':
-                bandname = bandname.replace(c, change[c])
+            bandname = bandname.replace(c, change[c])
         r = u''
         for i in bandname: # take care of unicode chars. shitty metal bands often use special characters to look hardcore
             if unicode_to_text_Matches.has_key(ord(i)):
@@ -299,7 +298,6 @@ class scapebot():
             try:
                 link = li.div.h3.a
                 URL = link['href']
-                print URL
                 m = re.search('bandcamp.com', URL) # this extra step makes sure we don't end up with the root URL of someone who mentions the bandname in a song title or some shit
                 if m:
                     URL = str(URL[:URL.find(m.group(0)) + 12])
@@ -378,7 +376,7 @@ class scapebot():
 
             try:
                 #redefine bandname with formatting from wiki header, band names can be weird, number 1 trusted source for name formatting
-                possibleName = soup.h1.renderContents().replace(' (musician)', '').replace(' (band)', '').replace(' (rock band)', '').replace('User:', '')
+                possibleName = soup.h1.renderContents().replace(' (musician)', '').replace(' (band)', '').replace(' (rock band)', '').replace('User:', '').replace(' (singer)', '')
                 if possibleName.find('<i>') > -1:
                     nameFormatted = False
                 else:
@@ -930,7 +928,7 @@ class scapebot():
 
         # Call these cities just by their name or nickname, everyone knows them
         majorCities = { 'Seattle': 'Seattle', 'Boston': 'Boston', 'Los Angeles': 'LA', 'Portland': 'Portland', 'Providence': 'Providence', 'Long Beach, California': 'Long Beach', 'San Fransisco': 
-                        'San Fransisco', 'Berkeley': 'Berkeley', 'Brooklyn': 'Brooklyn', 'Long Island': 'Long Island', 'Minneapolis': 'Minneapolis', 'Coney Island': 'Coney Island'}
+                        'San Fransisco', 'Berkeley': 'Berkeley', 'Brooklyn': 'Brooklyn', 'Long Island': 'Long Island', 'Minneapolis': 'Minneapolis', 'Coney Island': 'Coney Island', 'Vancouver, BC': 'Vancouver, BC'}
         
         # No postal codes!
         states = { 'Mississippi': 'MS', 'Oklahoma': 'OK', 'Wyoming': 'WY', 'Minnesota': 'MN', 'Alaska': 'AK', 'Illinois': 'IL', 'Arkansas': 'AR', 'New Mexico': 'NM', 'Indiana': 'IN', 'Maryland': 'MD', 
@@ -950,7 +948,7 @@ class scapebot():
 
         for i, p in enumerate(origin):
             s = string.capitalize(p.strip()) 
-            if s in states:
+            if s in states and i > 0:
                 origin[i] = states[s]
                 stateInd = i
 
@@ -998,9 +996,9 @@ class scapebot():
                 if index != stateInd:
                     origin[index] = string.capwords(word)
             origin = ', '.join(origin)
-
+            r = re.search(',? united states', origin, re.I)
+            if r: origin = origin.replace(r.group(0), '')
             r = re.search(',?\s?u.?[sn].?\s?', origin, re.I)
-            print r
             if r: origin = origin.replace(r.group(0), '')
             r = re.search(', Please Select Your Region', origin, re.I)
             print r
