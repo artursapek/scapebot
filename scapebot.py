@@ -333,7 +333,7 @@ class scapebot():
                 #print li.a.renderContents() 
                 link = li.div.h3.a
                 #print link.renderContents()
-                knownSources = {'Last.fm': 'last.fm/music', 'Soundcloud': 'soundcloud.com', 'ReverbNation': 'reverbnation.com', 'Facebook': 'faceboom.com'}
+                knownSources = {'Last.fm': 'last.fm/music', 'Soundcloud': 'soundcloud.com', 'ReverbNation': 'reverbnation.com', 'Facebook': 'facebook.com'}
                 for entry in knownSources:
                     try:
                         temp = link['href'].index(knownSources[entry])
@@ -344,7 +344,7 @@ class scapebot():
                             #print '.', knownSources[entry], self.sanitize(bandname) 
                             #print link['href']
                             
-                            if re.search(self.regexifyBandname(bandname), str(BeautifulSoup(br.open(link['href']).read())), flags=re.I):
+                            if re.search(self.regexifyBandname(bandname), str(BeautifulSoup(br.open(link['href']).read())), re.I):
                                 try:
                                     URL = str(link['href'][:link['href'].index('?')])
                                     sources[entry] = URL
