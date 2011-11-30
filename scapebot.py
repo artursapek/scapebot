@@ -364,7 +364,7 @@ class scapebot():
                 pass
 
 
-        print sources
+        # print sources
     
         # need to append genre, origin, and album cover
 
@@ -793,7 +793,8 @@ class scapebot():
         for genre in toRemove:
             genres.remove(genre)
         
-        rewords = {'Jazz-rock': 'Jazz Fusion', 'Hip\s?hop': 'Hip-hop', 'R[&amp;|n|&]b':'R&B', 'Desert rock': 'Stoner rock', 'Classic Rock': 'Rock'} # attention to detail is the most important part
+        rewords = {'Jazz-rock': 'Jazz Fusion', 'Hip\s?hop': 'Hip-hop', 'R[&amp;|n|&]b':'R&B', 'Desert rock': 'Stoner rock', 'Classic Rock': 'Rock',
+                   'Rock and Roll': 'Rock n Roll', 'Rock \'n\' Roll': 'Rock n Roll'} # attention to detail is the most important part
 
         for i, n in enumerate(genres):
             for repl in rewords:
@@ -938,17 +939,19 @@ class scapebot():
             if s in states and i > 0:
                 origin[i] = states[s]
                 stateInd = i
+            if s.upper() in states.itervalues() and i > 0:
+                stateInd = i
+
 
         if toRemove: origin.remove(toRemove[0])
 
-        
+        print stateInd, origin
 
         if stateInd > 0:
             for i in range(stateInd + 1, len(origin) - 1):
-                print origin[i]
                 origin.pop(i)
-
-        origin[i] = origin[i].upper()
+        
+        origin[stateInd] = origin[stateInd].upper()
 
 
         origin = ', '.join(origin)
@@ -964,8 +967,6 @@ class scapebot():
         # Change postal abbreviation to full state name 
         if not nickname:
         
-            # Cut off after state name
-                        
             # Remove regions, western, eastern, etc
             for region in ['western', 'eastern', 'northern', 'southern']:
                 r = re.search(region + '\s', origin, re.I)
