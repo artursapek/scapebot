@@ -668,7 +668,6 @@ class scapebot():
                         x = 2
                     bandcampINFO['Genres'] = temp[:len(temp) - x]
                     GENRES += self.cleanGenres(bandcampINFO['Genres'], bandname)
-                    print GENRES
                     # if we get bandcamp its often going to be the only source so let's milk it
                     if not nameFormatted:
                         namesection = soup.findAll('dl', attrs={ 'id' : 'name-section' })[0]
@@ -945,7 +944,6 @@ class scapebot():
 
         if toRemove: origin.remove(toRemove[0])
 
-        print stateInd, origin
 
         if stateInd > 0:
             for i in range(stateInd + 1, len(origin) - 1):
@@ -989,7 +987,6 @@ class scapebot():
             r = re.search(',?\s?u.?[sn].?\s?', origin, re.I)
             if r: origin = origin.replace(r.group(0), '')
             r = re.search(', Please Select Your Region', origin, re.I)
-            print r
             if r: origin = origin.replace(r.group(0), '')
                     
 
