@@ -709,10 +709,10 @@ class scapebot():
 
         INFO[1] = self.chooseGenres(GENRES)
 
-        originSrcs = [wikiINFO, lastfmINFO, soundcloudINFO, bandcampINFO, facebookINFO, myspaceINFO, reverbnationINFO]
+        originSrcs = [wikiINFO, lastfmINFO, soundcloudINFO, bandcampINFO, facebookINFO, reverbnationINFO, myspaceINFO]
         for src in originSrcs:
             if INFO[2] == '' and 'Origin' in src:
-                INFO[2] = src['Origin']
+                INFO[2] = self.cleanOrigin(src['Origin'], bandname)
             else:
                 pass
 
