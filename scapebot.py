@@ -364,7 +364,7 @@ class scapebot():
                 pass
 
 
-        # print sources
+        print sources
     
         # need to append genre, origin, and album cover
 
@@ -792,7 +792,7 @@ class scapebot():
         for genre in toRemove:
             genres.remove(genre)
         
-        rewords = {'Jazz-rock': 'Jazz Fusion', 'Hip\s?hop': 'Hip-hop', 'R[&amp;|n|&]b':'R&B', 'Desert rock': 'Stoner rock', 'Classic Rock': 'Rock',
+        rewords = {'Jazz-rock': 'Jazz Fusion', 'R[&amp;|n|&]b':'R&B', 'Desert rock': 'Stoner rock', 'Classic Rock': 'Rock',
                    'Rock and Roll': 'Rock n Roll', 'Rock \'n\' Roll': 'Rock n Roll'} # attention to detail is the most important part
 
         for i, n in enumerate(genres):
@@ -802,7 +802,7 @@ class scapebot():
             if bandname.lower() in n.lower() or len(n.split()) > 3: # second part dubbed the Gorge Mand rule, thank you Alina. "tags: [...], Kreayshawn can suck my clit, [...]"
                 genres.remove(n)
         
-        replacements = {'West coast\s?': '', 'East coast\s?': '', 'Alternative\s': 'Alt. ', ' revival': ''}
+        replacements = {'West coast\s?': '', 'East coast\s?': '', 'Alternative\s': 'Alt. ', ' revival': '', ' hop': '-hop', 'phop': 'p-hop'}
         for i, n in enumerate(genres):
             for repl in replacements:
                 r = re.search(repl, n, re.I)
@@ -914,7 +914,7 @@ class scapebot():
         nickname = False
 
         # Call these cities just by their name or nickname, everyone knows them
-        majorCities = { 'Seattle': 'Seattle', 'Boston': 'Boston', 'Los Angeles': 'LA', 'Portland': 'Portland', 'Providence': 'Providence', 'Long Beach, California': 'Long Beach', 'San Fransisco': 
+        majorCities = { 'Seattle|Seatle|Seatttle': 'Seattle', 'Boston': 'Boston', 'Los Angeles': 'LA', 'Portland': 'Portland', 'Providence': 'Providence', 'Long Beach, California': 'Long Beach', 'San Fransisco': 
                         'San Fransisco', 'Berkeley': 'Berkeley', 'Brooklyn': 'Brooklyn', 'Long Island': 'Long Island', 'Minneapolis': 'Minneapolis', 'Coney Island': 'Coney Island', 'Vancouver, BC': 'Vancouver, BC'}
         
         # No postal codes!
