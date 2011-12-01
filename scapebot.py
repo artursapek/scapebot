@@ -673,7 +673,6 @@ class scapebot():
                 for strong in target('strong'):
                     strong.replaceWith(strong.renderContents())
                 myspaceINFO['Origin'] = target.renderContents()[10:].strip()            
-
             except:
                 pass
 
@@ -685,14 +684,16 @@ class scapebot():
             info = soup.findAll('div', attrs={ 'class' : 'location_genres' })[0].renderContents() # all we need
             parts = info.split('\n')
             reverbnationINFO['Origin'] = parts[1].strip().replace('\r', '')
-            reverbnationINFO['Genres'] = parts[3].strip().replace('\r', '').split(' / ')
+            genres = parts[3].strip().replace('\r', '').split(' / ')
+            reverbnationINFO['Genres'] = self.cleanGenres(genres, bandname)
+            # reverb puts a limit of 2 on genres and some people list one as a list of more fuck all
+
             GENRES += reverbnationINFO['Genres']
         
 
         if 'Facebook' in sources:
             facebookINFO = {}
             soup = soupREPO['Facebook']
-
             # BeautifulSoup isn't of much use here because the code Facebook compiles into looks like shit
             ht = soup.find('Hometown</th>')
             if ht > -1: 
@@ -882,12 +883,26 @@ class scapebot():
                     # print r.group(0)
                     genres[i] = genres[i].replace(r.group(0), replacements[repl])
 
-        
+        splitThese = []
+
+        for i,g in enumerate(genres):
+            for d in [',', '/']:
+                if len(g.split(d)) > 1:
+                    splitThese.append(g)
+                    fixed = g.split(d)
+                    for i, n in fixed:
+                        fixed[i] = n.strip()
+                    genres += fixed
+                    break
+        for r in splitThese:
+            genres.remove(r)
+
+
         # capitalize
         for genre in genres:
             if genre not in rewords.itervalues():
                 ind = genres.index(genre)
-                genres[ind] = string.capitalize(genre.replace('&#160;', ' '))
+                genres[ind] = string.capitalize(genre.strip().replace('&#160;', ' '))
 
         return genres
 
@@ -899,16 +914,26 @@ class scapebot():
         done = False
 
         lastResorts = ['Electronic', 'Electronica', 'Indie', 'Rock', 'Alternative'] # prefer to remove genres that don't really mean shit but they can be a last resort. this usually leads scapebot to pick more interesting genres :)
+
+
+
+
+    
+
         remove = []
         for i, n in enumerate(genres):      
             for resort in lastResorts:
-                if n == resort:
+                if re.match(resort, n, re.I):
                     if n not in remove: # sometimes it adds in dupes without this
                         remove.append(n)
-
+        
+        
         for rem in remove:
             if len(genres) > 1:
                 genres.remove(rem)
+        
+        
+
 
 
 
@@ -928,9 +953,8 @@ class scapebot():
             if overlaps.count(genre) > 1:
                 overlaps.remove(genre)
 
-        #print 'rest', rest, 'overlaps', overlaps
+        print 'rest', rest, 'overlaps', overlaps
         
-
         # stage 1: 
         if overlaps:
             best = max(overlaps, key=lambda x: len(x) / len(x.split()))
