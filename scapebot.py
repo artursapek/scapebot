@@ -152,7 +152,7 @@ class scapebot():
         soup = BeautifulSoup(br.submit().read())
         if ignoreSuggest:
             suggestLink = soup.find('a', attrs={ 'class' : 'spell_orig' })
-            if suggestLink: soup = BeautifulSoup(br.follow_link(text=suggestLink.renderContents()).read()) # be stubborn and ignore Google's suggestion
+            if suggestLink: soup = BeautifulSoup(br.follow_link(text = query).read()) # be stubborn and ignore Google's suggestion
         try: 
             results = soup.find('ol', attrs={ 'id': 'rso' })
         except:
@@ -268,7 +268,7 @@ class scapebot():
                 for x in range(i, i + 2):
                     try:
                         if name[x][-1] != '?' or name[x][-2] != '?':
-                            name[x] = name[x] + '?' # add a question mark
+                            name[x] = name[x] + '?\w?' # add a question mark
                     except:
                         pass
                 tolerant = ''.join(name)
@@ -277,7 +277,6 @@ class scapebot():
                     found = True
                     update = r.group(0)                    
                     break
-        print update
         return found, update
 
     
@@ -376,7 +375,6 @@ class scapebot():
         # be more specific with search when dealing with Myspace and Wiki - they're not musician-specific
 
         if alternate:
-            print 'fuck all!'
             return alternate
         if not ignoreSuggest:
             if suggestion:
@@ -540,22 +538,16 @@ class scapebot():
                 genreInfo = soup.findAll('th', text='Genres')[0].parent.parent.parent.td
                 #print genreInfo
 
-                print genreInfo
                 for td in genreInfo('td'):
                     td.replaceWith(td.renderContents())
                 for link in genreInfo('a'):
                     link.replaceWith(link.renderContents())
-                print '!'
                 for citation in genreInfo('sup'):
                     citation.replaceWith('')
-                print '!'
-                print len(genreInfo.findAll('br'))
                 for linebreak in genreInfo('br'):
                     linebreak.replaceWith('')
-                print '!'
                 for span in genreInfo('span'):
                     span.replaceWith(span.renderContents())
-                print genreInfo
                 genres = genreInfo.renderContents().split(', ')
                 
                 
