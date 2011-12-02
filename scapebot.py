@@ -187,25 +187,99 @@ class scapebot():
 
     # band names are so difficult :(
 
-    def regexifyBandname(self, bandname):
+
+    # this just became the dankest function in this file in the world. it works beautifully though.
+
+    def regexifyBandname(self, bandname, listIt=False):
         # regexes for flexibility when checking a page for actual mentions of the name ^_^
-        change = { 'the ': '(the\s)?', ' ':'[-\s,]?', ' & ':'\sand\s|\s&\s',' and ':'\sand\s|\s&\s','DJ ':'(DJ\s)?','dj ':'(dj\s)?',}
-        for c in change:
-            bandname = bandname.replace(c, change[c])
-        r = u''
-        for i in bandname: # take care of unicode chars. shitty metal bands often use special characters to look hardcore
-            if unicode_to_text_Matches.has_key(ord(i)):
-                r += '[' + unicode_to_text_Matches[ord(i)] + i + ']'
-            if text_to_unicode_Matches.has_key(i):
-                r += '[' + i 
-                for val in text_to_unicode_Matches[i]:
-                    r += unichr( val )
-                r += ']'
-            elif ord(i) >= 0x80:
-                pass
-            else:
-                r += i
-        return r
+        change = { 'the ': '(the\s)?', ' ':'([-\s,]?)', ' & ':'(\sand\s|\s&\s)',' and ':'(\sand\s|\s&\s)','DJ ':'(DJ\s)?','dj ':'(dj\s)?',}
+        if not listIt:
+            for c in change:
+                bandname = bandname.replace(c, change[c])
+            r = u''
+            for i in bandname: # take care of unicode chars. shitty metal bands often use special characters to look hardcore
+                if unicode_to_text_Matches.has_key(ord(i)):
+                    r += '[' + unicode_to_text_Matches[ord(i)] + i + ']'
+                if text_to_unicode_Matches.has_key(i):
+                    r += '[' + i 
+                    for val in text_to_unicode_Matches[i]:
+                        r += unichr( val )
+                    r += ']'
+                elif ord(i) >= 0x80:
+                    pass
+                else:
+                    r += i
+            return r
+        else: # do the same shit, return as a list
+            changed = []
+            for i,n in enumerate(bandname):
+                for ind,ch in enumerate(change):
+                    if bandname[i:i + len(ch)] == ch:
+                        culprit = bandname[i:i + len(ch)]
+                        for duba in range(0, bandname.count(culprit)):
+                            w = bandname.find(culprit) # im running out of variables
+                            if w != -1:
+                                bandname = bandname[:w] + change[ch] + bandname[w + 1:]
+                                changed.append([w, len(change[ch])]) # commit
+                        # now we have an array like this [[1, 3], [5, 6]] for the fuckin indeces in the string to keep together in the list YO! so we can iterate over them as one. fuckall.
+
+            l = []
+            skip = 0
+            for ind,i in enumerate(bandname): # take care of unicode chars. shitty metal bands often use special characters to look hardcore
+                r = ''
+                stop = False
+                if skip > 0:
+                    skip -= 1
+                else:
+                    for y,x in enumerate(changed):
+                        if ind == changed[y][0]:
+                            l.append(bandname[ind:ind+changed[y][1]])
+                            stop = True
+                            skip = changed[y][1] - 1
+                            changed.pop(y)
+                    if not stop:
+                        if unicode_to_text_Matches.has_key(ord(i)):
+                            r +=  '[' + unicode_to_text_Matches[ord(i)] + i + ']'
+                        if text_to_unicode_Matches.has_key(i):
+                            r += '[' + i 
+                            for val in text_to_unicode_Matches[i]:
+                                r += unichr( val )
+                            r +=  ']' 
+                            l.append( r )
+                        elif ord(i) >= 0x80:
+                            pass
+                        else:
+                            l.append( i )
+            return l            # returns as a list. ''.join() this and it's the same shit as above. super dank.
+
+            
+    # moves a pair of question marks across the name, character by character. gives some tolerance for typos. fucking dank functions.
+
+    def flexibleComparison(self, bandname, soup=None):
+        # super dank. the objective: to get a typo like "andrew james robinson" to match with "andrew james robison". a pair of question marks will be gliding across the name.
+        found = False
+        update = bandname
+        if re.search(self.regexifyBandname(bandname), str(soup), re.I):
+            found = True
+        if found == False:
+            l = len(bandname)
+            for i in range(0, l - 3):
+                name = self.regexifyBandname(bandname, listIt = True) # list it bitch
+                for x in range(i, i + 2):
+                    try:
+                        if name[x][-1] != '?' or name[x][-2] != '?':
+                            name[x] = name[x] + '?' # add a question mark
+                    except:
+                        pass
+                tolerant = ''.join(name)
+                r = re.search(tolerant, str(soup), re.I)
+                if r:
+                    found = True
+                    update = r.group(0)                    
+                    break
+        print update
+        return found, update
+
     
     def bandAlreadyScraped(self, bandname):
         db = open('bandsScraped.txt', 'rb')
@@ -222,16 +296,13 @@ class scapebot():
 
 
 
-
-
-
     def research(self, bandname, ignoreS = False, local = False):
         try:
             print self.researchBand(bandname, local, ignoreS)
         except:
             pass
 
-
+    
 
 
 
@@ -326,9 +397,12 @@ class scapebot():
                     if m:
                         URL = str(m.group(0))
                     soup = BeautifulSoup(br.open(URL).read())
-                    if re.search(self.regexifyBandname(bandname), str(soup), re.I) and len(soup.findAll('h3', text='General Info', attrs={ 'class' : 'moduleHead' })) > 0:
+                    search, update = self.flexibleComparison(bandname, soup)
+                    if search and len(soup.findAll('h3', text='General Info', attrs={ 'class' : 'moduleHead' })) > 0:
                         sources['Myspace'] = URL
                         soupREPO['Myspace'] = soup
+                        if update != bandname:
+                            bandname = update
                         break
             except:
                 pass
@@ -342,9 +416,12 @@ class scapebot():
                 if re.search('wikipedia.org', link['href']):
                     soup = BeautifulSoup(br.open(link['href']).read())
                     header = soup.h1.renderContents()
-                    if header.find('song)') == -1 and re.search(self.regexifyBandname(bandname), str(soup), flags=re.I) and len(soup.findAll('a', href='/wiki/Music_genre')) > 0 and re.search(self.regexifyBandname(bandname), soup.h1.renderContents(), re.I) and '(soundtrack)' not in soup.h1.renderContents() and 'album)' not in soup.h1.renderContents():
+                    search, update = self.flexibleComparison(bandname, soup)                    
+                    if header.find('song)') == -1 and search and len(soup.findAll('a', href='/wiki/Music_genre')) > 0 and re.search(self.regexifyBandname(bandname), soup.h1.renderContents(), re.I) and '(soundtrack)' not in soup.h1.renderContents() and 'album)' not in soup.h1.renderContents():
                         sources['Wikipedia'] = str(link['href'])
-                        soupREPO['Wikipedia'] = soup                        
+                        soupREPO['Wikipedia'] = soup
+                        if update != bandname:
+                            bandname = update
                         break
             except:
                 pass
@@ -407,11 +484,14 @@ class scapebot():
                                     URL = m.group(0)
 
                             soup = BeautifulSoup(br.open(URL).read())
-                            
-                            if re.search(self.regexifyBandname(bandname), str(soup), re.I):
+                            search, update = self.flexibleComparison(bandname, soup)                                        
+                            if search:
                                 URL = re.match('[^?]*', str(link['href'])).group(0)
                                 sources[entry] = URL
                                 soupREPO[entry] = soup
+                                if update != bandname:
+                                    bandname = update
+
                             break
                         except:
                             pass
@@ -458,20 +538,26 @@ class scapebot():
             try:
                 
                 genreInfo = soup.findAll('th', text='Genres')[0].parent.parent.parent.td
-                
                 #print genreInfo
 
+                print genreInfo
+                for td in genreInfo('td'):
+                    td.replaceWith(td.renderContents())
                 for link in genreInfo('a'):
                     link.replaceWith(link.renderContents())
+                print '!'
                 for citation in genreInfo('sup'):
                     citation.replaceWith('')
+                print '!'
+                print len(genreInfo.findAll('br'))
                 for linebreak in genreInfo('br'):
                     linebreak.replaceWith('')
+                print '!'
                 for span in genreInfo('span'):
                     span.replaceWith(span.renderContents())
+                print genreInfo
                 genres = genreInfo.renderContents().split(', ')
                 
-
                 
                 # dealing with newlines:
 
@@ -899,10 +985,13 @@ class scapebot():
 
 
         # capitalize
-        for genre in genres:
+        for ind,genre in enumerate(genres):
             if genre not in rewords.itervalues():
                 ind = genres.index(genre)
                 genres[ind] = string.capitalize(genre.strip().replace('&#160;', ' '))
+
+
+        
 
         return genres
 
@@ -913,7 +1002,7 @@ class scapebot():
         overlaps = []
         done = False
 
-        lastResorts = ['Electronic', 'Electronica', 'Indie', 'Rock', 'Alternative'] # prefer to remove genres that don't really mean shit but they can be a last resort. this usually leads scapebot to pick more interesting genres :)
+        lastResorts = ['Electronic', 'Electronica', 'Indie', 'Rock', 'Alternative', 'Spoken word'] # prefer to remove genres that don't really mean shit but they can be a last resort. this usually leads scapebot to pick more interesting genres :)
 
 
 
