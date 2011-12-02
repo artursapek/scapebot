@@ -395,7 +395,8 @@ class scapebot():
                     if m:
                         URL = str(m.group(0))
                     soup = BeautifulSoup(br.open(URL).read())
-                    search, update = self.flexibleComparison(bandname, soup)
+                    header = soup.findAll('h1')[1]
+                    search, update = self.flexibleComparison(bandname, header.renderContents())
                     if search and len(soup.findAll('h3', text='General Info', attrs={ 'class' : 'moduleHead' })) > 0:
                         sources['Myspace'] = URL
                         soupREPO['Myspace'] = soup
@@ -452,6 +453,26 @@ class scapebot():
                 pass
 
 
+        soundcloud_results = self.Google('%s music soundcloud' % query, ignoreSuggest)
+        for li in soundcloud_results('li'):
+            try:
+                link = li.div.h3.a
+                if re.search('soundcloud.com', link['href']):
+                    m = re.match('http://www.soundcloud.com/[^/]*', link['href'])
+                    if m:
+                        URL = str(m.group(0))
+                    soup = BeautifulSoup(br.open(URL).read())
+                    header = soup.find('a', attrs={ 'class' : 'user-name' })
+                    search, update = self.flexibleComparison(bandname, header.renderContents())
+                    if search:
+                        sources['Soundcloud'] = URL
+                        soupREPO['Soundcloud'] = soup
+                        print 'piss'
+                        if update != bandname:
+                            bandname = update
+                        break
+            except:
+                pass
 
         results = self.Google(query, ignoreSuggest)
 
@@ -465,7 +486,7 @@ class scapebot():
                 #print li.a.renderContents() 
                 link = li.div.h3.a
                 #print link.renderContents()
-                knownSources = {'Last.fm': 'last.fm/music', 'Soundcloud': 'soundcloud.com', 'ReverbNation': 'reverbnation.com', 'Facebook': 'facebook.com'}
+                knownSources = {'Last.fm': 'last.fm/music', 'ReverbNation': 'reverbnation.com', 'Facebook': 'facebook.com'}
                 for entry in knownSources:
                     try:
                         temp = link['href'].index(knownSources[entry])
