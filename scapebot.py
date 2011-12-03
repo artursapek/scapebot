@@ -343,13 +343,12 @@ class scapebot():
     # output: [band name formatted, [one or two genres], band's origin (city/state), album cover source local]
     # called in scraping function for each band in show that's not already in db
 
-    def researchBand(self, bandname, forceLocal = False, ignoreSuggest = False):
+    def researchBand(self, bandname, forceLocal = False, ignoreSuggest = False, sources = {}):
         # set some quality-assurance variables :) <3
         nameFormatted = False
         GENRES = []
         TRUSTWORTHY_GENRES = []
         results = ''
-        sources = {}
         newestAlbumName = alternate = None
         originalInput = bandname
         wikiINFO = lastfmINFO = soundcloudINFO = bandcampINFO = facebookINFO = myspaceINFO = reverbnationINFO = {}
@@ -388,6 +387,8 @@ class scapebot():
       
 
         myspaceMusic_results = self.Google('%s music myspace' % query, ignoreSuggest)
+        myspaceMusic_results_alt = self.Google('\"%s\"' % bandname, ignoreSuggest)
+        myspaceMusic_results = BeautifulSoup(str(myspaceMusic_results) + str(myspaceMusic_results_alt)) # specific and unspecific. try both
         for li in myspaceMusic_results('li'):
             try:
                 link = li.div.h3.a
@@ -435,7 +436,7 @@ class scapebot():
                 URL = link['href']
                 m = re.search('bandcamp.com', URL) # this extra step makes sure we don't end up with the root URL of someone who mentions the bandname in a song title or some shit
                 if m:
-                    URL = str(URL[:URL.find(m.group(0)) + 12] + '/releases')
+                    URL = str(URL[:URL.find(m.group(0)) + 12] + '/releases') # tack on releases to jump straight to the page that has info. this always works, it's like bandcamp did this just for me :)
                     soup = BeautifulSoup(br.open(URL).read())
                     # from here down, it makes sure we haven't found the bandcamp or an artist with a similar name to a  mainstream artist without a bandcamp. an example I've found is 'beck burger' for 'beck'
                     # also for safe measure is the '[^\w]' part of the regex in case it were 'beckburger': no compound words containing the name we're looking for
@@ -443,10 +444,10 @@ class scapebot():
                     for a in byline('a'):
                         a.replaceWith(a.renderContents())
 
-                    bl = str(byline.renderContents()).replace('\n', '').strip()
+                    byline = bl = str(byline.renderContents()).replace('\n', '').strip()
                     r = re.search(self.regexifyBandname(bandname), bl, flags=re.I)
                     bl = bl[bl.find(r.group(0)):].split()
-                    if r and len(bandname.split()) == len(bl): # checks for other words or compound words
+                    if r and len(bandname.split()) == len(bl) and abs(len(byline) - len(bandname) <= 4): # checks for other words or compound words and follows that 4 character rule we use for Wikipedia
                         sources['Bandcamp'] = URL
                         soupREPO['Bandcamp'] = soup                        
                         break
@@ -763,7 +764,8 @@ class scapebot():
                     tag.replaceWith(tag.renderContents())
                 target = target.renderContents()[8:]
                 genres = self.cleanGenres(target.split(' / '), bandname)
-
+                
+                print genres
                 TRUSTWORTHY_GENRES += genres
 
             #   print 'MYSPACE genres', genres
@@ -786,11 +788,14 @@ class scapebot():
             info = soup.findAll('div', attrs={ 'class' : 'location_genres' })[0].renderContents() # all we need
             parts = info.split('\n')
             reverbnationINFO['Origin'] = parts[1].strip().replace('\r', '')
-            genres = parts[3].strip().replace('\r', '').split(' / ')
-            reverbnationINFO['Genres'] = self.cleanGenres(genres, bandname)
+            try:
+                genres = parts[3].strip().replace('\r', '').split(' / ')
+                reverbnationINFO['Genres'] = self.cleanGenres(genres, bandname)
+                GENRES += reverbnationINFO['Genres']            
+            except: # maybe they just have a location or something
+                pass
             # reverb puts a limit of 2 on genres and some people list one as a list of more fuck all
 
-            GENRES += reverbnationINFO['Genres']
         
 
         if 'Facebook' in sources:
@@ -910,9 +915,6 @@ class scapebot():
         
         self.genresDB(t_g, bandname)
 
-
-
-
         # quality control
         
         INFO[0] = INFO[0].strip()
@@ -930,17 +932,6 @@ class scapebot():
             return INFO
         else:
             return None
-
-
-
-
-
-
-
-
-
-
-
 
     def cleanBandname(self, name, original):
         alternatives = name.split('/') # there's been an instance where wikipedia gives an old name/new name combo. in this case just go with what they're going by now
@@ -993,7 +984,7 @@ class scapebot():
 
         splitThese = []
 
-        for i,g in enumerate(genres):
+        for i,g in enumerate(genres): # sometimes genres will be seperated by commas or slashes and it wont be caught by the default algorithm so just double-check and split any that may be clumped together swag 
             genres[i] = g = g.strip()
             for d in [',', '/']:
                 if len(g.split(d)) > 1:
