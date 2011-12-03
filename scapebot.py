@@ -501,12 +501,13 @@ class scapebot():
                                 m = re.match('http://www.last.fm/music/[^/]*', sources[entry])
                                 if m:
                                     URL = m.group(0)
-
-                            soup = BeautifulSoup(br.open(URL).read())
+                            source = br.open(URL).read()
+                            soup = BeautifulSoup(source)
                             search, update = self.flexibleComparison(bandname, soup)                                        
                             if search:
                                 URL = re.match('[^?]*', str(link['href'])).group(0)
                                 sources[entry] = URL
+                                if entry == 'Facebook': soup = source
                                 soupREPO[entry] = soup
                                 if update != bandname:
                                     bandname = update
@@ -804,8 +805,14 @@ class scapebot():
                 genre = soup[ge + 51:]
                 genre = genre[:genre.find('</')]
                 GENRES.append(genre)
-
-
+            if not nameFormatted:
+                pr = soup.find('<title>')
+                if pr > -1:
+                    header = soup[pr + 7:]
+                    header = header[:header.find(' | Facebook')]
+                    print header
+                    bandname = header
+                    nameFormatted = True
                 
 
         if 'Bandcamp' in sources:
@@ -918,6 +925,7 @@ class scapebot():
         # return if we have something
 
         if len(INFO[1]) != 0:
+            INFO[0] = INFO[0].decode('utf-8')
             return INFO
         else:
             return None
