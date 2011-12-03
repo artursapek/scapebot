@@ -646,8 +646,6 @@ class scapebot():
             except:
                 pass
 
-        print '.'
-    
 
         if 'Last.fm' in sources:
 
@@ -1004,9 +1002,7 @@ class scapebot():
                     if g[-1] == d:
                         genres[i] = g = g[:-1] # dont start or end with dat shit #UselessSourceCodeComments
                     splitThese.append(g)
-                    print g
                     fixed = g.split(d)
-                    print fixed
                     toRemove = []
                     for i, n in enumerate(fixed):
                         if n == '':
