@@ -152,7 +152,8 @@ class scapebot():
         soup = BeautifulSoup(br.submit().read())
         if ignoreSuggest:
             suggestLink = soup.find('a', attrs={ 'class' : 'spell_orig' })
-            if suggestLink: soup = BeautifulSoup(br.follow_link(text = query).read()) # be stubborn and ignore Google's suggestion
+            if suggestLink: 
+                soup = BeautifulSoup(br.follow_link(text = query).read()) # be stubborn and ignore Google's suggestion
         try: 
             results = soup.find('ol', attrs={ 'id': 'rso' })
         except:
@@ -361,9 +362,11 @@ class scapebot():
         br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]   
 
         # see if Google thinks the name is misspelled
+        query = bandname
+        if forceLocal: query += ' Seattle'
 
 
-        suggestion = self.GoogleSuggest(bandname)
+        suggestion = self.GoogleSuggest(query)
 
         # R E C U R S I O N ~~~~~ *****
         if not ignoreSuggest:
@@ -382,9 +385,7 @@ class scapebot():
                 bandname = ' '.join(suggestion.split()[0:x])
 
 
-        query = bandname
-        if forceLocal: query += ' Seattle'
-
+      
 
         myspaceMusic_results = self.Google('%s music myspace' % query, ignoreSuggest)
         for li in myspaceMusic_results('li'):
@@ -434,7 +435,7 @@ class scapebot():
                 URL = link['href']
                 m = re.search('bandcamp.com', URL) # this extra step makes sure we don't end up with the root URL of someone who mentions the bandname in a song title or some shit
                 if m:
-                    URL = str(URL[:URL.find(m.group(0)) + 12])
+                    URL = str(URL[:URL.find(m.group(0)) + 12] + '/releases')
                     soup = BeautifulSoup(br.open(URL).read())
                     # from here down, it makes sure we haven't found the bandcamp or an artist with a similar name to a  mainstream artist without a bandcamp. an example I've found is 'beck burger' for 'beck'
                     # also for safe measure is the '[^\w]' part of the regex in case it were 'beckburger': no compound words containing the name we're looking for
@@ -810,8 +811,7 @@ class scapebot():
                 if pr > -1:
                     header = soup[pr + 7:]
                     header = header[:header.find(' | Facebook')]
-                    print header
-                    bandname = header
+                    bandname = header.replace(' - Info', '')
                     nameFormatted = True
                 
 
