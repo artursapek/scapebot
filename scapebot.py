@@ -193,8 +193,11 @@ class scapebot():
 
     def regexifyBandname(self, bandname, listIt=False):
         # regexes for flexibility when checking a page for actual mentions of the name ^_^
+        questionOut = ['[', ']']
         change = { 'the ': '(the\s)?', ' ':'([-\s,]?)', ' & ':'(\sand\s|\s&\s)',' and ':'(\sand\s|\s&\s)','DJ ':'(DJ\s)?','dj ':'(dj\s)?',}
         if not listIt:
+            for q in questionOut:
+                bandname = bandname.replace(q, q + '?')
             for c in change:
                 bandname = bandname.replace(c, change[c])
             r = u''
@@ -353,7 +356,8 @@ class scapebot():
         originalInput = bandname
         wikiINFO = lastfmINFO = soundcloudINFO = bandcampINFO = facebookINFO = myspaceINFO = reverbnationINFO = {}
         soupREPO = {}
-        
+        sources = {}
+
         # yes I'm a bastard
 
         br = Browser()
@@ -417,7 +421,7 @@ class scapebot():
                 if re.search('wikipedia.org', link['href']):
                     soup = BeautifulSoup(br.open(link['href']).read())
                     header = soup.h1.renderContents()
-                    search, update = self.flexibleComparison(bandname, soup)                    
+                    search, update = self.flexibleComparison(bandname, soup)
                     if header.find('song)') == -1 and search and len(soup.findAll('a', href='/wiki/Music_genre')) > 0 and re.search(self.regexifyBandname(bandname), soup.h1.renderContents(), re.I) and '(soundtrack)' not in soup.h1.renderContents() and 'album)' not in soup.h1.renderContents():
                         sources['Wikipedia'] = str(link['href'])
                         soupREPO['Wikipedia'] = soup
@@ -454,13 +458,14 @@ class scapebot():
             except:
                 pass
 
+        URL = None
 
-        soundcloud_results = self.Google('%s music soundcloud' % query, ignoreSuggest)
+        soundcloud_results = self.Google('%s soundcloud' % query, ignoreSuggest)
         for li in soundcloud_results('li'):
             try:
                 link = li.div.h3.a
                 if re.search('soundcloud.com', link['href']):
-                    m = re.match('http://www.soundcloud.com/[^/]*', link['href'])
+                    m = re.search('http://w?w?w?.?soundcloud.com/[^/]*', link['href'])
                     if m:
                         URL = str(m.group(0))
                     soup = BeautifulSoup(br.open(URL).read())
@@ -469,12 +474,35 @@ class scapebot():
                     if search:
                         sources['Soundcloud'] = URL
                         soupREPO['Soundcloud'] = soup
-                        print 'piss'
                         if update != bandname:
                             bandname = update
                         break
             except:
                 pass
+
+
+        # omg find FB!!!! Zuckerbergggg
+
+        facebook_results = self.Google('site:facebook.com %s' % query, ignoreSuggest)
+        for li in facebook_results('li'):
+            try:
+                link = li.div.h3.a
+                if re.search('facebook.com', link['href']):
+                    URL = link['href'] + '?sk=info'
+                    soup = br.open(URL).read()
+                    search, update = self.flexibleComparison(bandname, soup)
+                    if search and soup.find('Genres') > -1:
+                        sources['Facebook'] = URL
+                        soupREPO['Facebook'] = soup
+                        if update != bandname:
+                            bandname = update
+                        break
+            except:
+                pass
+
+
+
+
 
         results = self.Google(query, ignoreSuggest)
 
@@ -488,7 +516,7 @@ class scapebot():
                 #print li.a.renderContents() 
                 link = li.div.h3.a
                 #print link.renderContents()
-                knownSources = {'Last.fm': 'last.fm/music', 'ReverbNation': 'reverbnation.com', 'Facebook': 'facebook.com'}
+                knownSources = {'Last.fm': 'last.fm/music', 'ReverbNation': 'reverbnation.com'}
                 for entry in knownSources:
                     try:
                         temp = link['href'].index(knownSources[entry])
@@ -498,7 +526,7 @@ class scapebot():
                         try:
                             #print '.', knownSources[entry], self.sanitize(bandname) 
                             #print link['href']
-                            URL = link['href']
+                            URL = FBURL = link['href']
                             if entry == 'Last.fm': # make sure to go to the artist's root page and not videos or something
                                 m = re.match('http://www.last.fm/music/[^/]*', sources[entry])
                                 if m:
@@ -509,7 +537,10 @@ class scapebot():
                             if search:
                                 URL = re.match('[^?]*', str(link['href'])).group(0)
                                 sources[entry] = URL
-                                if entry == 'Facebook': soup = source
+                                if entry == 'Facebook': 
+                                    soup = source # Facebook compiles in a non-BeautifulSoup-friendly way :( so we deal with it as a string
+                                    sources[entry] = FBURL
+
                                 soupREPO[entry] = soup
                                 if update != bandname:
                                     bandname = update
@@ -738,15 +769,13 @@ class scapebot():
 
             GENRES += soundcloudINFO['Genres']
             
-            # name (if no Wiki which is likely for bands with soundclouds)
             try:
-                if len(tags) > 0:
-                    temp = soup.findAll('div', attrs={ 'id' : 'user-info'})[0]
-                    if not nameFormatted:
-                        bandname = temp.h1.renderContents()[:temp.h1.renderContents().find('\n')]
-                        nameFormatted = True
-                        origin = temp.span.renderContents()
-                        soundcloudINFO['Origin'] = origin
+                if not nameFormatted:
+                    temp = soup.find('div', attrs={ 'id' : 'user-info'})                    
+                    bandname = temp.h1.renderContents()[:temp.h1.renderContents().find('\n')]
+                    nameFormatted = True
+                    origin = temp.span.renderContents()
+                    soundcloudINFO['Origin'] = origin
             except:
                 pass
 
@@ -1123,9 +1152,15 @@ class scapebot():
         nickname = False
 
         # Call these cities just by their name or nickname, everyone knows them
-        majorCities = { 'Seattle|Seatle|Seatttle': 'Seattle', 'Boston': 'Boston', 'Los Angeles': 'LA', 'Portland': 'Portland', 'Providence': 'Providence', 'Long Beach, California': 'Long Beach', 'San Fransisco': 
-                        'San Fransisco', 'Berkeley': 'Berkeley', 'Brooklyn': 'Brooklyn', 'Long Island': 'Long Island', 'Minneapolis': 'Minneapolis', 'Coney Island': 'Coney Island', 'Vancouver, BC': 'Vancouver, BC'}
-        
+        majorCities = { 'Seattle|Seatle|Seatttle': 'Seattle', 'Boston': 'Boston', 'Los Angeles': 'LA', 'Portland': 'Portland', 'Long Beach, California': 'Long Beach', 'San Fransisco': 
+                        'SF', 'Minneapolis': 'Minneapolis', 'Vancouver, BC': 'Vancouver, BC',
+                        'New York City|New York, New York': 'NYC'}
+
+        # neighborhoods and places known by name alone. so far just CA and NYC ,'>/
+        #            NYC:                                                                                      CA:
+        thatsIt = [ 'Brooklyn', 'Yonkers', 'Manhattan', 'The Bronx', 'Queens', 'Staten Island', 'Long Island', 'Berkeley', 'Long Beach', 'Echo Park', 'Orange County', 'Compton', 'Watts',
+                    'Providemce' ] 
+
         # No postal codes!
         states = { 'Mississippi': 'MS', 'Oklahoma': 'OK', 'Wyoming': 'WY', 'Minnesota': 'MN', 'Alaska': 'AK', 'Illinois': 'IL', 'Arkansas': 'AR', 'New Mexico': 'NM', 'Indiana': 'IN', 'Maryland': 'MD', 
                     'Louisiana': 'LA', 'Texas': 'TX', 'Iowa': 'IA', 'Wisconsin': 'WI', 'Arizona': 'AZ', 'Michigan': 'MI', 'Kansas': 'KS', 'Utah': 'UT', 'Virginia': 'VA', 'Oregon': 'OR', 'Connecticut': 'CT', 
@@ -1135,44 +1170,57 @@ class scapebot():
 
         stateInd = -1
 
-        if origin.find(', ') == -1:
-            origin = origin.replace(' ', ', ')
+        # Don't both specifying states of major cities
+        for name in thatsIt:
+            if re.search(name, origin, re.I):
+                origin = name
+                nickname = True
+                break
+        if not nickname:
+            for city in majorCities:
+                if re.search(city, origin, re.I):
+                    origin = majorCities[city]
+                    nickname = True
+                    break
+            
 
-        origin = origin.split(', ')
-
-        toRemove = []
-
-        for i, p in enumerate(origin):
-            s = string.capitalize(p.strip()) 
-            if s in states and i > 0:
-                origin[i] = states[s]
-                stateInd = i
-            if s.upper() in states.itervalues() and i > 0:
-                stateInd = i
-
-
-        if toRemove: origin.remove(toRemove[0])
-
-
-        if stateInd > 0:
-            for i in range(stateInd + 1, len(origin) - 1):
-                origin.pop(i)
-        
-        origin[stateInd] = origin[stateInd].upper()
-
-
-        origin = ', '.join(origin)
-        
+                
     
 
-        # Don't both specifying states of major cities
-        for city in majorCities:
-            if re.search(city, origin, re.I):
-                origin = majorCities[city]
-                nickname = True
+     
 
         # Change postal abbreviation to full state name 
         if not nickname:
+
+
+            if origin.find(', ') == -1:
+                origin = origin.replace(' ', ', ')
+
+            origin = origin.split(', ')
+
+            toRemove = []
+
+            for i, p in enumerate(origin):
+                s = string.capitalize(p.strip()) 
+                if s in states and i > 0:
+                    origin[i] = states[s]
+                    stateInd = i
+                if s.upper() in states.itervalues() and i > 0:
+                    stateInd = i
+
+
+            if toRemove: origin.remove(toRemove[0])
+
+
+            if stateInd > 0:
+                for i in range(stateInd + 1, len(origin) - 1):
+                    origin.pop(i)
+            
+            origin[stateInd] = origin[stateInd].upper()
+
+
+            origin = ', '.join(origin)
+
         
             # Remove regions, western, eastern, etc
             for region in ['western', 'eastern', 'northern', 'southern']:
