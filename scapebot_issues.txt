@@ -1,0 +1,22 @@
+Should scan personal websites for links to source websites (soundcloud, myspace, etc)
+'hot victory' last.fm issue
+ISSUES specific: 'black joe lewis & the honey bears', 'yo gabba gabba', 'jo koy'
+perhaps also scrape artistwiki.com. it's ugly as fuck but that doesn't matter here
+for partentheses: figure out the relationship between the XXXX and the (YYYY). FUCK. matt badger (ravenna woods) for example. google both, if one returns a band entry, check the other against the members? THen format it that way? fuck
+add comparison of boldtext and header in wikis
+factor into genres: grammy wins. significant. (wikipedia)
+beyonce's unicode still makes him choke
+'in flames' doesnt work for some reason
+fucking dude's name comes up as a genre for 'beady eye'
+for genres under 3 words, format them with google the same way bandnames are formatted. to check if theyre an acronym
+	need to follow image links on bandcamp if no name formatting immediately found. sometimes the first view is just an album view
+	'oc notes' for some stupid reason gives me some guy's myspace named 'illgsek' or 'iLLa "G"'
+crooked fingers locale is a last.fm (date-date)
+bandcamp - last resort source for info
+'love inks' isnt being found
+'isis & the ghost' found wrong
+'the loss' changes name cos 'the loss' is in the song name of another band. specify searching to the header
+add to sources: ReverbNation, PureVolume
+should prioritize genres with hyphens becausae they're all awesome
+scapebot needs a "Force local" setting for places like the Comet. Some of these shitty local bands have generic names used by other shitty bands in other cities
+only facebook? no genres? use genres of Influences if available
