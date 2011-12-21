@@ -1306,6 +1306,47 @@ class scapebot():
     # All venues have functions for A) Specific date and B) Upcoming future if their homepage is formatted that way (EX: Neumos's). The latter is for efficiency and to leave as small a footprint as possible 
     # Format: [ showID, venueID, Date, Time, Price, 21+, Bands ]
 
+
+
+    #pre: pass in a date in ddmmyy fashion :)
+    #post: returns a list of information on the show
+    def venueScrape_neptune(self, date):
+        result = []
+        bands = []
+        day = date[2:4]
+        if day[0] == '0':
+            day = day[1]
+        br = Browser()
+        test = ''
+        hasBreak = '<br'
+        soup = BeautifulSoup(br.open('http://stgpresents.org/calendar/calendar.asp?venue=neptune').read())
+        shows = soup.findAll('td', attrs={'class': 'calendar-day'})
+        for show in shows:
+            if show.p.renderContents() == day:
+                result.append(date)
+                result.append(show.span.renderContents())
+                bands.append(show.a.renderContents())
+                #go to next page to find 21+ & price
+                soup = BeautifulSoup(br.follow_link(text = show.a.renderContents()).read())
+                #do price
+                price = soup.find(attrs={'class' : 'aPrice'}).renderContents()
+                if hasBreak in price:
+                    price = price[:price.find("<br")].replace('"', '')
+                    result.append(price)
+                else:
+                    result.append(price)
+                #do 21+
+                age = soup.find(attrs={'class' : 'aNotes'}).renderContents()
+                if  '21' in age:
+                    result.append(True)
+                else:
+                    result.append(False)
+                #add other bands :^)
+                guests = soup.find(attrs={
+            else:
+                pass
+        print result
+
     
     def Comet_Tavern(self, date):
         br = Browser()
