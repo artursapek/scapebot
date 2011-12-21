@@ -1341,8 +1341,14 @@ class scapebot():
                     result.append(True)
                 else:
                     result.append(False)
-                #add other bands :^)
-                guests = soup.find(attrs={
+                #add other bands :^)   need to solve for other cases!!!
+                guests = soup.find(attrs={'id' : 'aGuest'}).renderContents()
+                guests = guests.split('<br />')
+                guests = guests[1].replace('"', '').split(',')
+                bands += guests
+                for i,n in enumerate(bands):
+                    bands[i] = n.strip()
+                result.append(bands)
             else:
                 pass
         print result
