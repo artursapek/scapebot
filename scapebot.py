@@ -1426,6 +1426,8 @@ class scapebot():
                 pass
         print result
 
+    #def venueScrape_neumos(self, date):
+
     #pre: pass in the date in mmddyy fashion and just the first name of the venue. i.e. moore and not moore theater. Both Streeengs plz &^)
     #post: returns a list of show details    
     def venueScrape_STG(self, date, venue):
@@ -1441,7 +1443,6 @@ class scapebot():
             pass
         result = []
         bands = []
-        print venue
         day = date[2:4]
         if day[0] == '0':
             day = day[1]
@@ -1456,6 +1457,8 @@ class scapebot():
                 findTime = show.findAll('span', attrs={'class': 'venue' + venueName.capitalize()})
                 if len(findTime) > 1:
                     time = findTime[len(findTime) - 1]
+                elif len(findTime) == 0:
+                    return "No Show Tonight"
                 else:
                     time = findTime[0]
                 result.append(time.renderContents())
@@ -1667,8 +1670,9 @@ class scapebot():
 
             return show
 
-    def Neumos(self, date):
+    def venueScrape_neumos(self, date):
         br = Browser()
+        bandList = []
         monthgiven = months[int(date[0:2]) - 1]
         soup = BeautifulSoup(br.open('http://neumos.com/neumoscalendar.php?month_offset=').read())
         month = str(soup.findAll('th', attrs={ 'class' : 'CalendarMonth' })[0].renderContents())
@@ -1745,10 +1749,11 @@ class scapebot():
                 
                 show = ['2', date, time, price, booze]
                 for band in bands:
-                    show.append(band)
-                print show
+                    bandList.append(band)
+                show.append(bandList)
+                return show
         except:
-                print 'No show that day.'
+                return 'No show that day.'
 
     def Stranger_Music_Listings(self):    # For cross-referencing, supplementing information
         br = Browser()
