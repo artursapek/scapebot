@@ -1430,6 +1430,7 @@ class scapebot():
     #post: returns a list of show details    
     def venueScrape_STG(self, date, venue):
         venue = venue.lower()
+        venueName = venue.lower()
         if venue == 'moore':
             venue = 'http://stgpresents.org/calendar/calendar.asp?venue=moore'
         elif venue == 'neptune':
@@ -1452,10 +1453,20 @@ class scapebot():
         for show in shows:
             if show.p.renderContents() == day:
                 result.append(date)
-                result.append(show.span.renderContents())
-                bands.append(show.a.renderContents())
+                findTime = show.findAll('span', attrs={'class': 'venue' + venueName.capitalize()})
+                if len(findTime) > 1:
+                    time = findTime[len(findTime) - 1]
+                else:
+                    time = findTime[0]
+                result.append(time.renderContents())
+                findShow = show.findAll('a', attrs={'class': 'venue' + venueName.capitalize()})
+                if len(findShow) > 1:
+                    goToShow = findShow[len(findShow) - 1]
+                else:
+                    goToShow = findShow[0]
+                bands.append(goToShow.renderContents())
                 #go to next page to find 21+ & price
-                soup = BeautifulSoup(br.follow_link(text = show.a.renderContents()).read())
+                soup = BeautifulSoup(br.follow_link(text = goToShow.renderContents()).read())
                 #do price
                 price = soup.find(attrs={'class' : 'aPrice'})
                 if price != None:
@@ -1480,7 +1491,6 @@ class scapebot():
                     result.append(False)
                     pass
                 #add other bands :^)   need to solve for other cases!!!
-                
                 guests = soup.find(attrs={'id' : 'aGuest'})
                 if guests != None:
                     guests = guests.renderContents()
