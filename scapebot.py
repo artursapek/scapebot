@@ -1326,6 +1326,7 @@ class scapebot():
                 result.append(date)
                 result.append(show.span.renderContents())
                 bands.append(show.a.renderContents())
+                print bands
                 #go to next page to find 21+ & price
                 soup = BeautifulSoup(br.follow_link(text = show.a.renderContents()).read())
                 #do price
@@ -1352,6 +1353,49 @@ class scapebot():
             else:
                 pass
         print result
+
+    def venueScrape_moore(self, date):
+        result = []
+        bands = []
+        day = date[2:4]
+        if day[0] == '0':
+            day = day[1]
+        br = Browser()
+        test = ''
+        hasBreak = '<br'
+        soup = BeautifulSoup(br.open('http://stgpresents.org/calendar/calendar.asp?venue=moore').read())
+        shows = soup.findAll('td', attrs={'class': 'calendar-day'})
+        for show in shows:
+            if show.p.renderContents() == day:
+                result.append(date)
+                result.append(show.span.renderContents())
+                bands.append(show.a.renderContents())
+                #go to next page to find 21+ & price
+                soup = BeautifulSoup(br.follow_link(text = show.a.renderContents()).read())
+                #do price
+                price = soup.find(attrs={'class' : 'aPrice'}).renderContents()
+                if hasBreak in price:
+                    price = price[:price.find("<br")].replace('"', '')
+                    result.append(price)
+                else:
+                    result.append(price)
+                #do 21+
+                age = soup.find(attrs={'class' : 'aNotes'}).renderContents()
+                if  '21' in age:
+                    result.append(True)
+                else:
+                    result.append(False)
+                #add other bands :^)   need to solve for other cases!!!
+                guests = soup.find(attrs={'id' : 'aGuest'}).renderContents()
+                guests = guests.split('<br />')
+                guests = guests[1].replace('"', '').split(',')
+                bands += guests
+                for i,n in enumerate(bands):
+                    bands[i] = n.strip()
+                result.append(bands)
+            else:
+                pass
+        print result    
 
     
     def Comet_Tavern(self, date):
