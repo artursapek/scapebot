@@ -1326,7 +1326,6 @@ class scapebot():
                 result.append(date)
                 result.append(show.span.renderContents())
                 bands.append(show.a.renderContents())
-                print bands
                 #go to next page to find 21+ & price
                 soup = BeautifulSoup(br.follow_link(text = show.a.renderContents()).read())
                 #do price
@@ -1337,19 +1336,28 @@ class scapebot():
                 else:
                     result.append(price)
                 #do 21+
-                age = soup.find(attrs={'class' : 'aNotes'}).renderContents()
-                if  '21' in age:
-                    result.append(True)
+                age = soup.find(attrs={'class' : 'aNotes'})
+                if age != None:
+                    age = age.renderContents()
+                    if  '21' in age:
+                        result.append(True)
+                    else:
+                        result.append(False)
                 else:
-                    result.append(False)
+                    pass
                 #add other bands :^)   need to solve for other cases!!!
-                guests = soup.find(attrs={'id' : 'aGuest'}).renderContents()
-                guests = guests.split('<br />')
-                guests = guests[1].replace('"', '').split(',')
-                bands += guests
-                for i,n in enumerate(bands):
-                    bands[i] = n.strip()
-                result.append(bands)
+                guests = soup.find(attrs={'id' : 'aGuest'})
+                if guests != None: 
+                    guests = guests.renderContents()
+                    guests = guests.split('<br />')
+                    guests = guests[1].replace('"', '').split(',')
+                    bands += guests
+                    for i,n in enumerate(bands):
+                        bands[i] = n.strip()
+                    result.append(bands)
+                else:
+                    result.append(bands)
+                    pass
             else:
                 pass
         print result
@@ -1380,19 +1388,29 @@ class scapebot():
                 else:
                     result.append(price)
                 #do 21+
-                age = soup.find(attrs={'class' : 'aNotes'}).renderContents()
-                if  '21' in age:
-                    result.append(True)
+                age = soup.find(attrs={'class' : 'aNotes'})
+                if age != None:
+                    age = age.renderContents()
+                    if  '21' in age:
+                        result.append(True)
+                    else:
+                        result.append(False)
                 else:
-                    result.append(False)
+                    pass
                 #add other bands :^)   need to solve for other cases!!!
-                guests = soup.find(attrs={'id' : 'aGuest'}).renderContents()
-                guests = guests.split('<br />')
-                guests = guests[1].replace('"', '').split(',')
-                bands += guests
-                for i,n in enumerate(bands):
-                    bands[i] = n.strip()
-                result.append(bands)
+                
+                guests = soup.find(attrs={'id' : 'aGuest'})
+                if guests != None:
+                    guests = guests.renderContents()
+                    guests = guests.split('<br />')
+                    guests = guests[1].replace('"', '').split(',')
+                    bands += guests
+                    for i,n in enumerate(bands):
+                        bands[i] = n.strip()
+                    result.append(bands)
+                else:
+                    result.append(bands)
+                    pass
             else:
                 pass
         print result    
