@@ -1426,7 +1426,58 @@ class scapebot():
                 pass
         print result
 
-    #def venueScrape_neumos(self, date):
+    def rid(self, phrase):
+        for word in ['and', 'with', '&']:
+            while phrase.find(word) != -1:
+                phrase = phrase.replace(word, 'duba')
+        if ':' in phrase:
+            phrase = phrase.split(':')
+            return phrase[1]
+        return phrase
+            
+        
+
+    def venueScrape_crocodile(self, date):
+        result = []
+        bands = []
+        dayInt = 0
+        day = date[2:4]
+        if day[0] == '0':
+            day = day[1]
+        dayInt = int(day)
+        br = Browser()
+        soup = BeautifulSoup(br.open('http://thecrocodile.com/index.html?page=calendar').read())
+        calendar = soup.find('div', attrs={'id' : 'fullCalendar'})
+        counter = -11
+        for li in calendar('li'):
+            counter += 1
+            if counter == dayInt:
+                result.append(date)
+                # go into show                              this link will only work for a specific case. gotta figure it out
+                soup = BeautifulSoup(br.follow_link(url = '?page=calendar&event=10996953',nr = 0).read())
+                heading = str(soup.find('h3'))
+                heading = heading.replace('<h3>', '').replace('</h3>', '')
+                heading = self.rid(heading)
+                bands = heading.split('duba')
+                print bands
+                notes = soup.find('p')
+                notes = str(notes)
+                notes = notes.replace('\n', '')
+                notes = notes.replace(' ', '')
+                notes = notes.split('<br/>')
+                time = notes[0]
+                time = time.replace('<p>', '')
+                result.append(time)
+                is21 = notes[0]
+                if '21' in is21:
+                    result.append(True)
+                else:
+                    result.append(False)
+                result.append(bands)
+                return result
+            else:
+                pass
+            
 
     #pre: pass in the date in mmddyy fashion and just the first name of the venue. i.e. moore and not moore theater. Both Streeengs plz &^)
     #post: returns a list of show details    
