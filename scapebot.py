@@ -1,20 +1,14 @@
-' scapebot is a part of Carl Sagans Laboratories '
-' authored by Artur Sapek '
+' scapebot is a web spider that can research bands and scrape show information from Seattle venues '
+' he is basically our slave '
+' authors: Artur Sapek, Michael Beswetherick '
 
-
-
-
-
-from BeautifulSoup import BeautifulSoup, SoupStrainer
+from BeautifulSoup import BeautifulSoup
 from mechanize import Browser
 from collections import defaultdict
 import csv
 import string
 import re
 import os
-#from PIL import Image
-
-
 
 
 class scapebot():
@@ -137,9 +131,7 @@ class scapebot():
     # Googles something, returns the results as BeautifulSoup
 
     def Google(self, query, ignoreSuggest):
-        br = Browser()
-        br.set_handle_robots(False)
-        br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]                       
+        br = self.freeBrowser()    
         br.open('http://google.com')
         br.select_form(nr=0)
         if len(query) / len(query.split()) <= 3:
@@ -161,9 +153,7 @@ class scapebot():
         return results
 
     def GoogleSuggest(self, query):
-        br = Browser()
-        br.set_handle_robots(False)
-        br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]                       
+        br = self.freeBrowser()
         br.open('http://google.com')
         br.select_form(nr=0)
         if len(query) / len(query.split()) <= 3:
@@ -360,9 +350,7 @@ class scapebot():
 
         # yes I'm a bastard
 
-        br = Browser()
-        br.set_handle_robots(False)
-        br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]   
+        br = self.freeBrowser()
 
         # see if Google thinks the name is misspelled
         query = bandname
@@ -1254,40 +1242,6 @@ class scapebot():
 
 
 
-    # album cover funct development on hold because PIL and _imaging library installation is pathetic
-
-
-    # Album_cover function. going to be super dank. seperate from rest of researchBand
-    # Testing With The Big Echo By The Morning Benders
-    def getAlbumCover(self, newestAlbumName):
-        sources = {}
-        br = self.freeBrowser()
-        if 'Wikipedia' in sources:
-            # Get most recent album from there
-        # Should probably also find their p4k in research, too
-            pass
-
-        # Wow, Fuck, Saving Images Is Easy
-        cover = open('./covers/m/TheMorningBenders.jpg', 'wb')
-        
-        src = br.open_novisit('http://upload.wikimedia.org/wikipedia/en/6/6c/TheMorningBendersBigEcho.jpg').read()
-
-        cover.write(src)
-
-        cover.close()
-
-        cover = Image.open('./covers/m/TheMorningBenders.jpg').resize( (80,80), Image.ANTIALIAS )
-        try:
-            cover.save('./covers/m/TheMorningBenders.jpg', 'JPEG')
-        except:
-            print 'resize save error!'
-
-
-    
-
-
-
-
 
     def freeBrowser(self):
         br = Browser()
@@ -1316,7 +1270,7 @@ class scapebot():
         day = date[2:4]
         if day[0] == '0':
             day = day[1]
-        br = Browser()
+        br = self.freeBrowser()
         test = ''
         hasBreak = '<br'
         soup = BeautifulSoup(br.open('http://stgpresents.org/calendar/calendar.asp?venue=neptune').read())
@@ -1373,7 +1327,7 @@ class scapebot():
         day = date[2:4]
         if day[0] == '0':
             day = day[1]
-        br = Browser()
+        br = self.freeBrowser()
         test = ''
         hasBreak = '<br'
         soup = BeautifulSoup(br.open('http://stgpresents.org/calendar/calendar.asp?venue=moore').read())
@@ -1445,7 +1399,7 @@ class scapebot():
         if day[0] == '0':
             day = day[1]
         dayInt = int(day)
-        br = Browser()
+        br = self.freeBrowser()
         soup = BeautifulSoup(br.open('http://thecrocodile.com/index.html?page=calendar').read())
         calendar = soup.find('div', attrs={'id' : 'fullCalendar'})
         counter = -11
@@ -1497,7 +1451,7 @@ class scapebot():
         day = date[2:4]
         if day[0] == '0':
             day = day[1]
-        br = Browser()
+        br = self.freeBrowser()
         test = ''
         hasBreak = '<br'
         soup = BeautifulSoup(br.open(venue).read())
@@ -1567,7 +1521,7 @@ class scapebot():
         day = date[2:4]
         if day[0] == '0':
             day = day[1]
-        br = Browser()
+        br = self.freeBrowser()
         test = ''
         hasBreak = '<br'
         soup = BeautifulSoup(br.open('http://stgpresents.org/calendar/calendar.asp?venue=pmt').read())
@@ -1622,7 +1576,7 @@ class scapebot():
 
     
     def Comet_Tavern(self, date):
-        br = Browser()
+        br = self.freeBrowser()
         br.open('http://www.comettavern.com/shows.php')
         br.select_form(nr=0)
         month = months[int(date[0:2]) - 1]
@@ -1666,7 +1620,7 @@ class scapebot():
         return show
 
     def Neumos_Scrape_Upcoming(self):
-        br = Browser()
+        br = self.freeBrowser()
         soup = br.open('http://neumos.com/neumos.php').read()
         soup = BeautifulSoup(soup)
         show = []
@@ -1722,7 +1676,7 @@ class scapebot():
             return show
 
     def venueScrape_neumos(self, date):
-        br = Browser()
+        br = self.freeBrowser()
         bandList = []
         monthgiven = months[int(date[0:2]) - 1]
         soup = BeautifulSoup(br.open('http://neumos.com/neumoscalendar.php?month_offset=').read())
@@ -1807,7 +1761,7 @@ class scapebot():
                 return 'No show that day.'
 
     def Stranger_Music_Listings(self):    # For cross-referencing, supplementing information
-        br = Browser()
+        br = self.freeBrowser()
         br.open('http://www.thestranger.com/seattle/Music')
         listings = br.follow_link(text='Music Listings').read()
         listings = BeautifulSoup(listings)
@@ -1852,10 +1806,8 @@ class scapebot():
         server.quit()
 
     def twitter(self, action):    # Fun shit
-        br = Browser()
+        br = self.freeBrowser()
         password = open('twitterpassword.txt').readline()[0:9]
-        br.set_handle_robots(False) # not spamming or abusing twitter, just using it creatively :)
-        br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]       
         br.open('https://mobile.twitter.com/session/new')
         br.select_form(nr=0)
         br.form['username'] = 'scapebot'
