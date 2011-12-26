@@ -5,6 +5,7 @@
 from BeautifulSoup import BeautifulSoup
 from mechanize import Browser
 from collections import defaultdict
+from random import *
 import csv
 import string
 import re
@@ -1526,7 +1527,7 @@ class scapebot():
 
             return show
 
-    def venueScrape_neumos(self, date):
+    def scrapeVenue_neumos(self, date):
         br = self.freeBrowser()
         bandList = []
         monthgiven = months[int(date[0:2]) - 1]
@@ -1663,17 +1664,17 @@ class scapebot():
         br.select_form(nr=0)
         br.form['username'] = 'scapebot'
         br.form['password'] = password
-        br.submit()
+        soup = BeautifulSoup(br.submit().read())
         
         #logged in
 
-        if action[0] == "tweet":
+        if action[0] == 'tweet':
             br.select_form(nr=0)            
             br['tweet[text]'] = action[1]
             br.submit()
 
         if action[0] == "search":
-            isSearchForm = lambda l: l.action == 'http://mobile.twitter.com/searches'
+            isSearchForm = lambda l: l.action == 'https://mobile.twitter.com/searches'
             returnTweets = []
             br.select_form(predicate=isSearchForm)
             br['search[query]'] = action[1]
@@ -1692,9 +1693,82 @@ class scapebot():
                 tweetContents = '@%s %s' % (sender, message)
                 returnTweets.append(tweetContents)
             return returnTweets 
+        
+        if action[0] == 'trending':
+            trending = soup.find('div', attrs={'class': 'search-trends'}).findAll('a')
+            links = [ ]
+            for a in trending:
+                links.append(a)
+            chosen = choice(links)
+            soup = BeautifulSoup(br.follow_link(url=chosen['href']).read())
+            tweets = soup.findAll('div', attrs={'class' : 'list-tweet'} )
+            returnTweets = [ ]
+            for tweet in tweets:
+                sender = tweet.find('strong').a.renderContents()
+                message = tweet.find('span', attrs={ 'class' : 'status' } ).renderContents()
+                message_soup = BeautifulSoup(message)
+                for tag in message_soup.findAll(True):
+                    if tag.name == 'a':
+                        hashtag = '%s' % tag.renderContents()
+                        tag.replaceWith(hashtag)
+                message = message_soup.renderContents()
+                tweetContents = message
+                returnTweets.append(tweetContents)
+
+
+            
+            soup = BeautifulSoup(' '.join(re.findall('\w+', ' '.join(returnTweets))))
+            for tag in soup(True):
+                tag.replaceWith(tag.renderContents())
+            words = [ ]
+            for i in range(0, 10):
+                word = choice(soup.renderContents().split(' ')).strip()
+                if word != 'RT' and word.find('@') == -1 and len(word) > 3 and word.find(chosen.renderContents().replace('#','')) == -1 and word != ' ': 
+                    words.append(word.replace(',', ''))
+            words += ['420', 'weed', 'bieber']
+            chosenToSearch = choice(words)
+
+            soup = BeautifulSoup(' '.join(re.findall('\w+', ' '.join(self.twitter(['search', chosenToSearch])))))
+            for tag in soup(True):
+                tag.replaceWith(tag.renderContents())
+            words = [ ]
+            for i in range(0, choice([3, 4])):
+                word = choice(soup.renderContents().split(' ')).strip()
+                if word != 'RT' and word.find('@') == -1 and len(word) > 3 and word.find(chosen.renderContents().replace('#','')) == -1 and word != ' ': 
+                    words.append(word.replace(',', ''))
+
+
+            final = '#'
+            for i, n in enumerate(words): 
+                final += string.capitalize(n)
+            return final
+
+
+
+    def randomWordFromTrending(self):
+        pass
+
 
     def tweet(self, tweet):
         self.twitter(['tweet', tweet])
+
+
+    def removeNewlines(self, x):
+        for i,n in enumerate(x):
+            x[i] = n.replace('\n', '')
+        return x
+
+
+    def generateTweet(self):
+        tweet = ''
+        greetingsFile = open('greetings.txt', 'rb')
+        greetings = self.removeNewlines(greetingsFile.readlines())
+        commentaryFile = open('commentary.txt', 'rb')
+        commentary = self.removeNewlines(commentaryFile.readlines())
+        print choice(greetings)
+        print choice(commentary)
+        
+        return tweet
 
 
 
