@@ -1264,133 +1264,8 @@ class scapebot():
 
     #pre: pass in a date in ddmmyy fashion :)
     #post: returns a list of information on the show
-    def venueScrape_neptune(self, date):
-        result = []
-        bands = []
-        day = date[2:4]
-        if day[0] == '0':
-            day = day[1]
-        br = self.freeBrowser()
-        test = ''
-        hasBreak = '<br'
-        soup = BeautifulSoup(br.open('http://stgpresents.org/calendar/calendar.asp?venue=neptune').read())
-        shows = soup.findAll('td', attrs={'class': 'calendar-day'})
-        for show in shows:
-            if show.p.renderContents() == day:
-                result.append(date)
-                result.append(show.span.renderContents())
-                bands.append(show.a.renderContents())
-                #go to next page to find 21+ & price
-                soup = BeautifulSoup(br.follow_link(text = show.a.renderContents()).read())
-                #do price
-                price = soup.find(attrs={'class' : 'aPrice'})
-                if price != None: 
-                    price = price.renderContents()
-                    if hasBreak in price:
-                        price = price[:price.find("<br")].replace('"', '')
-                        result.append(price)
-                    else:
-                        result.append(price)
-                else:
-                    reulst.append("Free")
-                    pass
-                #do 21+
-                age = soup.find(attrs={'class' : 'aNotes'})
-                if age != None:
-                    age = age.renderContents()
-                    if  '21' in age:
-                        result.append(True)
-                    else:
-                        result.append(False)
-                else:
-                    pass
-                #add other bands :^)   need to solve for other cases!!!
-                guests = soup.find(attrs={'id' : 'aGuest'})
-                if guests != None: 
-                    guests = guests.renderContents()
-                    guests = guests.split('<br />')
-                    guests = guests[1].replace('"', '').split(',')
-                    bands += guests
-                    for i,n in enumerate(bands):
-                        bands[i] = n.strip()
-                    result.append(bands)
-                else:
-                    result.append(bands)
-                    pass
-            else:
-                pass
-        print result
-
-    def venueScrape_moore(self, date):
-        result = []
-        bands = []
-        day = date[2:4]
-        if day[0] == '0':
-            day = day[1]
-        br = self.freeBrowser()
-        test = ''
-        hasBreak = '<br'
-        soup = BeautifulSoup(br.open('http://stgpresents.org/calendar/calendar.asp?venue=moore').read())
-        shows = soup.findAll('td', attrs={'class': 'calendar-day'})
-        for show in shows:
-            if show.p.renderContents() == day:
-                result.append(date)
-                result.append(show.span.renderContents())
-                bands.append(show.a.renderContents())
-                #go to next page to find 21+ & price
-                soup = BeautifulSoup(br.follow_link(text = show.a.renderContents()).read())
-                #do price
-                price = soup.find(attrs={'class' : 'aPrice'})
-                if price != None:
-                    price = price.renderContents()
-                    if hasBreak in price:
-                        price = price[:price.find("<br")].replace('"', '')
-                        result.append(price)
-                    else:
-                        result.append(price)
-                else:
-                    result.append("Free")
-                    pass
-                #do 21+
-                age = soup.find(attrs={'class' : 'aNotes'})
-                if age != None:
-                    age = age.renderContents()
-                    if  '21' in age:
-                        result.append(True)
-                    else:
-                        result.append(False)
-                else:
-                    result.append(False)
-                    pass
-                #add other bands :^)   need to solve for other cases!!!
-                
-                guests = soup.find(attrs={'id' : 'aGuest'})
-                if guests != None:
-                    guests = guests.renderContents()
-                    guests = guests.split('<br />')
-                    guests = guests[1].replace('"', '').split(',')
-                    bands += guests
-                    for i,n in enumerate(bands):
-                        bands[i] = n.strip()
-                    result.append(bands)
-                else:
-                    result.append(bands)
-                    pass
-            else:
-                pass
-        print result
-
-    def rid(self, phrase):
-        for word in ['and', 'with', '&']:
-            while phrase.find(word) != -1:
-                phrase = phrase.replace(word, 'duba')
-        if ':' in phrase:
-            phrase = phrase.split(':')
-            return phrase[1]
-        return phrase
-            
-        
-
+    
+   
     def venueScrape_crocodile(self, date):
         result = []
         bands = []
@@ -1439,22 +1314,25 @@ class scapebot():
         venue = venue.lower()
         venueName = venue.lower()
         if venue == 'moore':
-            venue = 'http://stgpresents.org/calendar/calendar.asp?venue=moore'
+            URL = 'http://stgpresents.org/calendar/calendar.asp?venue=moore'
         elif venue == 'neptune':
-            venue = 'http://stgpresents.org/calendar/calendar.asp?venue=neptune'
+            URL = 'http://stgpresents.org/calendar/calendar.asp?venue=neptune'
         elif venue == 'paramount':
-            venue = 'http://stgpresents.org/calendar/calendar.asp?venue=pmt'
+            URL = 'http://stgpresents.org/calendar/calendar.asp?venue=pmt'
         else:
             pass
         result = []
         bands = []
         day = date[2:4]
+        month = date[0:2]
         if day[0] == '0':
             day = day[1]
+        if month[0] == '0':
+            month = month[1]
         br = self.freeBrowser()
         test = ''
         hasBreak = '<br'
-        soup = BeautifulSoup(br.open(venue).read())
+        soup = BeautifulSoup(br.open(URL + '&month=' + month + '&year=2012').read())
         shows = soup.findAll('td', attrs={'class': 'calendar-day'})
         for show in shows:
             if show.p.renderContents() == day:
@@ -1515,66 +1393,7 @@ class scapebot():
                 pass
         print result
     
-    def venueScrape_paramount(self, date):
-        result = []
-        bands = []
-        day = date[2:4]
-        if day[0] == '0':
-            day = day[1]
-        br = self.freeBrowser()
-        test = ''
-        hasBreak = '<br'
-        soup = BeautifulSoup(br.open('http://stgpresents.org/calendar/calendar.asp?venue=pmt').read())
-        shows = soup.findAll('td', attrs={'class': 'calendar-day'})
-        for show in shows:
-            if show.p.renderContents() == day:
-                result.append(date)
-                result.append(show.span.renderContents())
-                bands.append(show.a.renderContents())
-                #go to next page to find 21+ & price
-                soup = BeautifulSoup(br.follow_link(text = show.a.renderContents()).read())
-                #do price
-                price = soup.find(attrs={'class' : 'aPrice'})
-                if price != None:
-                    price = price.renderContents()
-                    if hasBreak in price:
-                        price = price[:price.find("<br")].replace('"', '')
-                        result.append(price)
-                    else:
-                        result.append(price)
-                else:
-                    result.append("Free")
-                    pass
-                #do 21+
-                age = soup.find(attrs={'class' : 'aNotes'})
-                if age != None:
-                    age = age.renderContents()
-                    if  '21' in age:
-                        result.append(True)
-                    else:
-                        result.append(False)
-                else:
-                    result.append(False)
-                    pass
-                #add other bands :^)   need to solve for other cases!!!
-                
-                guests = soup.find(attrs={'id' : 'aGuest'})
-                if guests != None:
-                    guests = guests.renderContents()
-                    guests = guests.split('<br />')
-                    guests = guests[1].replace('"', '').split(',')
-                    bands += guests
-                    for i,n in enumerate(bands):
-                        bands[i] = n.strip()
-                    result.append(bands)
-                else:
-                    result.append(bands)
-                    pass
-            else:
-                pass
-        print result    
-
-    
+     
     def Comet_Tavern(self, date):
         br = self.freeBrowser()
         br.open('http://www.comettavern.com/shows.php')
