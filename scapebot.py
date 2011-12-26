@@ -1295,24 +1295,24 @@ class scapebot():
         result = []
         bands = []
         dayInt = 0
+        year = '2011'
         day = date[2:4]
         month = date[0:2]
-        year = '20'
-        year = year + date[4:6]
-        if day[0] == '0':
-            day = day[1]
-        if month[0] == '0':
-            month = month[1]
-        dayInt = int(day)
+        if date[4:6]:
+            year = '20' + date[4:6]
         br = self.freeBrowser()
         soup = BeautifulSoup(br.open('http://thecrocodile.com/index.html?page=calendar&month=' + year + month).read())
+        print 'http://thecrocodile.com/index.html?page=calendar&month=' + year + month
         calendar = soup.find('div', attrs={'id' : 'fullCalendar'})
-        counter = -11
+        counter = 0
         for li in calendar('li'):
-            counter += 1
-            if counter == dayInt:
-                result.append(date)
-                soup = BeautifulSoup(br.follow_link(url = li.a['href'],nr = 0).read())
+            try: 
+                li['class']
+            except:
+                counter += 1
+            if counter == int(day) and li.a:
+                result.append(month + day + year)
+                soup = BeautifulSoup(br.follow_link(url = li.a['href']).read())
                 heading = str(soup.find('h3'))
                 heading = heading.replace('<h3>', '').replace('</h3>', '')
                 heading = self.rid(heading)
@@ -1336,9 +1336,10 @@ class scapebot():
                 else:
                     result.append(False)
                 result.append(bands)
-                return result
+                break
             else:
                 pass
+        return result
             
 
     #pre: pass in the date in mmddyy fashion and just the first name of the venue. i.e. moore and not moore theater. Both Streeengs plz &^)
