@@ -1264,7 +1264,16 @@ class scapebot():
 
     #pre: pass in a date in ddmmyy fashion :)
     #post: returns a list of information on the show
-    
+
+    def rid(self, phrase):
+        for word in ['and', 'with', '&']:
+            while phrase.find(word) != -1:
+                phrase = phrase.replace(word, 'duba')
+        if ':' in phrase:
+            phrase = phrase.split(':')
+            return phrase[1]
+        return phrase    
+
    
     def venueScrape_crocodile(self, date):
         result = []
