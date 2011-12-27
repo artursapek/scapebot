@@ -392,10 +392,10 @@ class scapebot():
                     soup = BeautifulSoup(br.open(URL).read())
                     header = soup.findAll('h1')[1]
                     search, update = self.flexibleComparison(bandname, header.renderContents())
-                    if search and len(soup.findAll('h3', text='General Info', attrs={ 'class' : 'moduleHead' })) > 0:
+                    if search and len(soup.findAll('h3', text='General Info', attrs={ 'class' : 'moduleHead' })) > 0 and soup.find(attrs={'class':'odd BandGenres'}):
                         sources['Myspace'] = URL
                         soupREPO['Myspace'] = soup
-                        if update != bandname:
+                        if update != bandname: # MAKE SURE THERE ARE EVEN GENRES FUCK MAN
                             bandname = update
                         break
             except:
@@ -421,29 +421,31 @@ class scapebot():
                 pass
 
         # search for bandcamp
-
         bandcamp_results = self.Google('%s bandcamp' % query, ignoreSuggest)
         for li in bandcamp_results('li'):
             try:
                 link = li.div.h3.a
                 URL = link['href']
                 m = re.search('bandcamp.com', URL) # this extra step makes sure we don't end up with the root URL of someone who mentions the bandname in a song title or some shit
-                if m:
-                    URL = str(URL[:URL.find(m.group(0)) + 12] + '/releases') # tack on releases to jump straight to the page that has info. this always works, it's like bandcamp did this just for me :)
+                URL = URL[:URL.find('com') + 3]
+                URL +=  '/releases' # tack on releases to jump straight to the page that has info. this always works, it's like bandcamp did this just for me :)
+                try:
                     soup = BeautifulSoup(br.open(URL).read())
-                    # from here down, it makes sure we haven't found the bandcamp or an artist with a similar name to a  mainstream artist without a bandcamp. an example I've found is 'beck burger' for 'beck'
-                    # also for safe measure is the '[^\w]' part of the regex in case it were 'beckburger': no compound words containing the name we're looking for
-                    byline = soup.findAll('span', attrs={'itemprop': 'byArtist'})[0]
-                    for a in byline('a'):
-                        a.replaceWith(a.renderContents())
-
-                    byline = bl = str(byline.renderContents()).replace('\n', '').strip()
-                    r = re.search(self.regexifyBandname(bandname), bl, flags=re.I)
-                    bl = bl[bl.find(r.group(0)):].split()
-                    if r and len(bandname.split()) == len(bl) and abs(len(byline) - len(bandname) <= 4): # checks for other words or compound words and follows that 4 character rule we use for Wikipedia
-                        sources['Bandcamp'] = URL
-                        soupREPO['Bandcamp'] = soup                        
-                        break
+                    if m or str(soup).count('bandcamp.com') > 5:
+                        # from here down, it makes sure we haven't found the bandcamp or an artist with a similar name to a  mainstream artist without a bandcamp. an example I've found is 'beck burger' for 'beck'
+                        # also for safe measure is the '[^\w]' part of the regex in case it were 'beckburger': no compound words containing the name we're looking for
+                        byline = soup.findAll('span', attrs={'itemprop': 'byArtist'})[0]
+                        for a in byline('a'):
+                            a.replaceWith(a.renderContents())
+                        byline = bl = str(byline.renderContents()).replace('\n', '').strip()
+                        r = re.search(self.regexifyBandname(bandname), bl, re.I)
+                        bl = bl[bl.find(r.group(0)):].split()
+                        if r and len(bandname.split()) == len(bl) and abs(len(byline) - len(bandname) <= 4): # checks for other words or compound words and follows that 4 character rule we use for Wikipedia
+                            sources['Bandcamp'] = URL
+                            soupREPO['Bandcamp'] = soup                        
+                            break
+                except:
+                    pass
             except:
                 pass
 
@@ -1302,7 +1304,6 @@ class scapebot():
             year = '20' + date[4:6]
         br = self.freeBrowser()
         soup = BeautifulSoup(br.open('http://thecrocodile.com/index.html?page=calendar&month=' + year + month).read())
-        print 'http://thecrocodile.com/index.html?page=calendar&month=' + year + month
         calendar = soup.find('div', attrs={'id' : 'fullCalendar'})
         counter = 0
         for li in calendar('li'):
