@@ -1295,7 +1295,11 @@ class scapebot():
                     goToShow = findShow[0]
                 bands.append(goToShow.renderContents())
                 #go to next page to find 21+ & price
-                soup = BeautifulSoup(br.follow_link(text = goToShow.renderContents()).read())
+                linkText = goToShow.renderContents()
+                if linkText.find('&amp;'):
+                    linkText = linkText[:linkText.find('&amp;')]
+                soup = BeautifulSoup(br.follow_link(text_regex = linkText).read())
+
                 #do price
                 price = soup.find(attrs={'class' : 'aPrice'})
                 if price != None:
@@ -1334,7 +1338,7 @@ class scapebot():
                     pass
             else:
                 pass
-        print result
+        return result
     
      
     def Comet_Tavern(self, date):
