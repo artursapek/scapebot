@@ -15,6 +15,8 @@ import os
 class scapebot():
 
     def __init__(self):
+        global thisYear
+        thisYear = '2012'
         global months 
         months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
         global monthsabbr 
@@ -1204,13 +1206,12 @@ class scapebot():
         result = []
         bands = []
         dayInt = 0
-        year = '2011'
         day = date[2:4]
         month = date[0:2]
         if date[4:6]:
             year = '20' + date[4:6]
         br = self.freeBrowser()
-        soup = BeautifulSoup(br.open('http://thecrocodile.com/index.html?page=calendar&month=' + year + month).read())
+        soup = BeautifulSoup(br.open('http://thecrocodile.com/index.html?page=calendar&month=' + thisYear + month).read())
         calendar = soup.find('div', attrs={'id' : 'fullCalendar'})
         counter = 0
         for li in calendar('li'):
@@ -1274,7 +1275,7 @@ class scapebot():
         br = self.freeBrowser()
         test = ''
         hasBreak = '<br'
-        soup = BeautifulSoup(br.open(URL + '&month=' + month + '&year=2012').read())
+        soup = BeautifulSoup(br.open(URL + '&month=' + month + '&year=' + thisYear).read())
         shows = soup.findAll('td', attrs={'class': 'calendar-day'})
         for show in shows:
             if show.p.renderContents() == day:
@@ -1524,6 +1525,9 @@ class scapebot():
 
 
     def scrapeVenue_jazzAlley(self, date):
+        result = []
+        band = []
+        result.append(date)
         br = self.freeBrowser()
         soup = BeautifulSoup(br.open('http://www.jazzalley.com/calendar.asp').read())
         weeks = soup.findAll('table', attrs={'height': '60', 'border': '0', 'cellspacing': '4', 'cellpadding': '2'})
