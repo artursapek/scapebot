@@ -1521,6 +1521,32 @@ class scapebot():
         except:
                 return 'No show that day.'
 
+
+
+    def scrapeVenue_jazzAlley(self, date):
+        br = self.freeBrowser()
+        soup = BeautifulSoup(br.open('http://www.jazzalley.com/calendar.asp').read())
+        weeks = soup.findAll('table', attrs={'height': '60', 'border': '0', 'cellspacing': '4', 'cellpadding': '2'})
+        for week in weeks:
+            days = week.findAll('td', attrs={'bgcolor': '#9f7800'})
+            showinfo = week.findAll('td')[8]
+            for entry in days:
+                day = entry.find('font', attrs={'size': '2'}).renderContents().replace('<b>','').replace('<br />', '').replace('</b>', '').strip()
+                month = entry.findAll('font', attrs={'size':'1'})[2].renderContents().replace('</b>', '').strip()
+                month = str(['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].index(month) + 1)
+                if len(month) == 1:
+                    month = '0' + month
+                if len(day) == 1:
+                    day = '0' + day
+                if month + day == date[0:4]:
+                    URL = showinfo.a['href']
+                    break
+        soup = BeautifulSoup(br.open(URL).read())
+        header = soup.findAll('span', attrs={'class': 'columnHeader'})[1].renderContents()
+        print header
+
+
+
     def Stranger_Music_Listings(self):    # For cross-referencing, supplementing information
         br = self.freeBrowser()
         br.open('http://www.thestranger.com/seattle/Music')
@@ -1679,5 +1705,27 @@ class scapebot():
         
         return tweet
 
+
+    def randomSentence(self, band='Wilco'):
+        words = ['is', 'are', 'were', 'was']
+        word = choice(words)
+        br = self.freeBrowser()
+        soup = br.open('http://en.wikipedia.org/wiki/Special:Random').read()
+        sentences = re.findall(r'[\w\s]+\s%s\s.*' % word, soup)[:-1]
+        if sentences: 
+            sentence = choice(sentences)
+            if sentence[sentence.find(' %s ' % word):sentence.find('.')].find('mandatory') == -1:
+                sentence = band + sentence[sentence.find(' %s ' % word):sentence.find('.')]
+                sentence = ' '.join(sentence.split()[0:len(sentence.split())-int(random()*2)])
+                if sentence.find('<') > -1:
+                    sentence = sentence[:sentence.find('<')]
+                if len(sentence) > 12:
+                    return sentence
+                else:
+                    self.randomSentence(band)
+            else:
+                self.randomSentence(band)
+        else:
+            self.randomSentence(band)
 
 
