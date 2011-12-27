@@ -46,28 +46,6 @@ class scapebot():
     def stripofASCII(self, string):
         pass
 
-    def scrapeComet(self):
-        file = open('shows.csv', 'rb')
-        ID = int(len(file.readlines())) - 1
-        file.close()
-        file = open('shows.csv', 'a')
-        
-        writer = csv.writer(file)
-
-        for i in range(1, 31):
-            addon = ''
-            if i < 10:
-                addon = '0'
-            date = '11' + addon + str(i)
-            show = self.Comet_Tavern(date)
-            if show:
-                ID += 1
-                show.insert(0, ID)
-            #   print show
-                writer.writerow(tuple(show))
-            
-        file.close()
-
     def researchLoop(self):
         nameInput = raw_input('> ')
         local = raw_input('local? ')
@@ -94,40 +72,6 @@ class scapebot():
     # these functions will be used several times per show when scraping shows:
 
     # hangs up on Facebook pages
-
-    def checkBand(self, bandname): # checks if a band exists in the db, if not this will redirect to research band
-        file = open('bands.csv', 'rb')
-        ID = int(len(file.readlines()))
-        file.seek(0)
-        reader = csv.reader(file)
-        bandfound = False
-        for row in reader:
-            if row[1] == bandname:
-                bandfound = True
-                return row[0]
-                break
-        if not bandfound:
-            file.close()
-            file = open('bands.csv', 'a')
-            writer = csv.writer(file)
-            writer.writerow((ID, bandname))
-            file.close()
-            return ID
-
-    def getBand(self, ID):
-        file = open('bands.csv', 'rb')
-        reader = csv.reader(file)
-        rownum = -1
-        bandfound = False
-        for row in reader:
-            rownum += 1
-            if rownum == ID:
-                return row
-                bandfound = True
-                break
-        if not bandfound:
-            return 'No band with that ID'
-    
     
     # Googles something, returns the results as BeautifulSoup
 
@@ -295,42 +239,6 @@ class scapebot():
             print self.researchBand(bandname, local, ignoreS)
         except:
             pass
-
-    
-
-
-
-
-    # keeps a db of legit genres from Wikipedia and Last.fm, and a count of their appearance, to pick out realistic ones from bandcamp/myspace/other user-edited sources
-    def genresDB(self, genres, bandname):
-        if not self.bandAlreadyScraped(bandname):
-            toAdd = []
-            db = open('genres.csv', 'rb')
-            temp = open('temp.csv', 'wb')
-            reader = csv.reader(db)
-            writer = csv.writer(temp)
-            db.seek(0)
-            for line in reader:
-                if line[0] in genres:
-                    writer.writerow((line[0], str(int(line[1]) + 1)))
-                    genres.remove(line[0])
-                else:
-                    writer.writerow(line)
-            for genre in genres:
-                writer.writerow((genre, 1))
-            db.close()
-            temp.close()
-            with open('temp.csv', 'rb') as temp:
-                lines = temp.readlines()
-                lines.sort()
-            with open('genres.csv', 'wb') as genres:
-                genres.writelines(lines)
-            temp.close()
-            genres.close()
-            os.remove('temp.csv')
-
-
-        
 
     # huge function: researchBand
     # input: band name
@@ -933,7 +841,6 @@ class scapebot():
         for genre in toRemove:
             t_g.remove(genre)
         
-        self.genresDB(t_g, bandname)
 
         # quality control
         
