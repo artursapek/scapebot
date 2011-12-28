@@ -1253,92 +1253,88 @@ class scapebot():
 
     #pre: pass in the date in mmddyy fashion and just the first name of the venue. i.e. moore and not moore theater. Both Streeengs plz &^)
     #post: returns a list of show details    
-    def scrapeVenue_STG(self, date, venue):
-        venue = venue.lower()
-        venueName = venue.lower()
-        if venue == 'moore':
-            URL = 'http://stgpresents.org/calendar/calendar.asp?venue=moore'
-        elif venue == 'neptune':
-            URL = 'http://stgpresents.org/calendar/calendar.asp?venue=neptune'
-        elif venue == 'paramount':
-            URL = 'http://stgpresents.org/calendar/calendar.asp?venue=pmt'
+    def scrapeVenue_STG(self, br, date = None, venue = None, action='scrape', soup = None, month = None):
+        if action == 'open':
+            URL = 'http://stgpresents.org/calendar/calendar.asp?venue=' + { 'moore': 'moore', 'neptune': 'neptune', 'paramount': 'pmt' }[venue]
+            return BeautifulSoup(br.open(URL + '&month=' + month + '&year=' + thisYear).read())
         else:
-            pass
-        result = []
-        bands = []
-        day = date[2:4]
-        month = date[0:2]
-        if day[0] == '0':
-            day = day[1]
-        if month[0] == '0':
-            month = month[1]
-        br = self.freeBrowser()
-        test = ''
-        hasBreak = '<br'
-        soup = BeautifulSoup(br.open(URL + '&month=' + month + '&year=' + thisYear).read())
-        shows = soup.findAll('td', attrs={'class': 'calendar-day'})
-        for show in shows:
-            if show.p.renderContents() == day:
-                result.append(date)
-                findTime = show.findAll('span', attrs={'class': 'venue' + venueName.capitalize()})
-                if len(findTime) > 1:
-                    time = findTime[len(findTime) - 1]
-                elif len(findTime) == 0:
-                    return "No Show Tonight"
-                else:
-                    time = findTime[0]
-                result.append(time.renderContents())
-                findShow = show.findAll('a', attrs={'class': 'venue' + venueName.capitalize()})
-                if len(findShow) > 1:
-                    goToShow = findShow[len(findShow) - 1]
-                else:
-                    goToShow = findShow[0]
-                bands.append(goToShow.renderContents())
-                #go to next page to find 21+ & price
-                linkText = goToShow.renderContents()
-                if linkText.find('&amp;'):
-                    linkText = linkText[:linkText.find('&amp;')]
-                soup = BeautifulSoup(br.follow_link(text_regex = linkText).read())
-
-                #do price
-                price = soup.find(attrs={'class' : 'aPrice'})
-                if price != None:
-                    price = price.renderContents()
-                    if hasBreak in price:
-                        price = price[:price.find("<br")].replace('"', '')
-                        result.append(price)
+            month = date[0:2]
+            if month[0] == '0':
+                month = month[1]
+            day = date[2:4]
+            result = []
+            bands = []
+            test = ''
+            hasBreak = '<br'
+            shows = soup.findAll('td', attrs={'class': 'calendar-day'})
+            for show in shows:
+                if show.p.renderContents() == day:
+                    result.append(date)
+                    findTime = show.findAll('span', attrs={'class': 'venue' + venue.capitalize()})
+                    if len(findTime) > 1:
+                        time = findTime[len(findTime) - 1]
+                    elif len(findTime) == 0:
+                        return []
                     else:
-                        result.append(price)
-                else:
-                    result.append("Free")
-                    pass
-                #do 21+
-                age = soup.find(attrs={'class' : 'aNotes'})
-                if age != None:
-                    age = age.renderContents()
-                    if  '21' in age:
-                        result.append(True)
+                        time = findTime[0]
+                    result.append(time.renderContents())
+                    findShow = show.findAll('a', attrs={'class': 'venue' + venue.capitalize()})
+                    if len(findShow) > 1:
+                        goToShow = findShow[len(findShow) - 1]
                     else:
-                        result.append(False)
+                        goToShow = findShow[0]
+                    if goToShow.renderContents().find('Free Neptune') == -1:
+                    
+                        bands.append(goToShow.renderContents())
+                        #go to next page to find 21+ & price
+                        linkText = goToShow.renderContents()
+                        if linkText.find('&amp;'):
+                            linkText = linkText[:linkText.find('&amp;')]
+                        soup = BeautifulSoup(br.follow_link(text_regex = linkText).read())
+                        
+                        #do price
+                        price = soup.find(attrs={'class' : 'aPrice'})
+                        if price != None:
+                            price = price.renderContents()
+                            if hasBreak in price:
+                                price = price[:price.find("<br")].replace('"', '')
+                                result.append(price)
+                            else:
+                                result.append(price)
+                        else:
+                            result.append("Free")
+                            pass
+                        #do 21+
+                        age = soup.find(attrs={'class' : 'aNotes'})
+                        if age != None:
+                            age = age.renderContents()
+                            if  '21' in age:
+                                result.append(True)
+                            else:
+                                result.append(False)
+                        else:
+                            result.append(False)
+                            pass
+                        #add other bands :^)   need to solve for other cases!!!
+                        guests = soup.find(attrs={'id' : 'aGuest'})
+                        br.back()
+                        
+                        if guests != None:
+                            guests = guests.renderContents()
+                            guests = guests.split('<br />')
+                            guests = guests[1].replace('"', '').split(',')
+                            bands += guests
+                            for i,n in enumerate(bands):
+                                bands[i] = n.strip()
+                            result.append(bands)
+                        else:
+                            result.append(bands)
+                            pass
+                    else:
+                        result = []
                 else:
-                    result.append(False)
                     pass
-                #add other bands :^)   need to solve for other cases!!!
-                guests = soup.find(attrs={'id' : 'aGuest'})
-                if guests != None:
-                    guests = guests.renderContents()
-                    guests = guests.split('<br />')
-                    guests = guests[1].replace('"', '').split(',')
-                    bands += guests
-                    for i,n in enumerate(bands):
-                        bands[i] = n.strip()
-                    result.append(bands)
-                else:
-                    result.append(bands)
-                    pass
-            else:
-                pass
-        return result
+            return result
     
      
     def Comet_Tavern(self, date):
