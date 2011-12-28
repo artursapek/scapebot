@@ -1302,29 +1302,32 @@ class scapebot():
                             dict = None
                             priceItems = re.findall(r'\$[/\$\w\s]+', price)
                             for i,x in enumerate(priceItems):
-                                
-                                y = re.findall('\$\w+', x)
+                                y = re.findall('\$[\w\s]+', x)
                                 if len(y) > 1: # if two prices in one line nigguh
-                                    for ind,n in enumerate(y):
-                                        dict = [ ]
-                                        for p in ['advance', 'day of', 'uw student']:
-                                            if re.search(p, x, re.I):
-                                                dict.append(p)
-                                    print dict
-                                    if dict and 'uw student' in dict:
-                                        for t, r in enumerate(dict):
-                                            if r.find('student') == -1:
-                                                UWindex = t
-                                    parsedPrice.append( (y[0] + '(' + y[1] + 'UW)' + {'advance': 'ADV', 'day of': 'DAYOF'}[dict[UWindex]] if len(dict) > 1 else None) )                                                                              
+                                    print y
+                                    yjoined = ''.join(y)
+                                    if yjoined.find('UW') != -1: UW = True
+                                    else: UW = False
+                                    if UW:
+                                        ints = re.findall('\d+', yjoined)
+                                        for intInd, intN in enumerate(ints):
+                                            ints[intInd] = int(intN)
+                                        minPrice = min(ints)
+                                        maxPrice = max(ints)
+                                        parsedPrice.append('$%s%s(UW)' % (str(maxPrice), str(minPrice)))
+                                        if re.search('advance', yjoined):
+                                            parsedPrice.append('ADV')
+                                        if re.search('day of', yjoined):
+                                            parsedPrice.append('DAYOF')
                                 elif len(y) == 1:
-                                    price = y[0]
+                                    parsedPrice.append(re.search(r'\$\w+', y[0]).group(0))
                                     if re.search('advance', x, re.I):
-                                        parsedPrice.append(price + 'ADV')
+                                        parsedPrice[i] += 'ADV'
                                     if re.search('uw student', x, re.I):
-                                        parsedPrice.append(price + 'UW')
+                                        parsedPrice[i] += '(UW)'
                                     if re.search('day of show', x, re.I):
-                                        parsedPrice.append(price + 'DAYOF')
-                            result.append(''.join(parsedPrice) if parsedPrice else price)
+                                        parsedPrice[i] += 'DAYOF'
+                            result.append(''.join(parsedPrice))
                         else:
                             result.append("Free")
                             pass
