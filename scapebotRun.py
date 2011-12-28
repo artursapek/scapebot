@@ -14,26 +14,33 @@ now = datetime.now().month
 global br
 br = sc.freeBrowser()
 
-def scrapeVenue(venue, month, br):
-    if venue in STG:
-        soup = scrapingFuncs[venue](br, venue=STG[venue], action='open', month=month)
-    else:
-        soup = scrapingFuncs[venue](br, action='open', month=month)
-    for i in range(1, daysMos[month]):
-        day = str(i)
-        if i < 10:
-            day = '0' + day
-        date = month+day
-        # nigger
-        print date
-       # try:
-        if venue in STG:
-            print scrapingFuncs[venue](br, date=date, soup=soup, venue=STG[venue])
 
-        else:
-            print scrapingFuncs[venue](date)
-       # except:
-        #    pass
+
+def parseDate(month, day):
+    day = str(day)
+    if len(day) == 1:
+        day = '0' + day
+    return month+day
+
+
+def scrapeVenue_fullMonth(venue, month, br):
+
+    shows = [ ]
+
+    soup = scrapingFuncs[venue](br, venue=STG[venue] if venue in STG else venue, action='open', month=month)
+
+    for i in range(1, daysMos[month]):
+        date = parseDate(month, i)
+        show = scrapingFuncs[venue](br, date=date, soup=soup, venue=STG[venue] if venue in STG else venue)
+        if show:
+                shows.append(show)
+    print shows
+
+
+
+
+
+
 
 def scrapeVenueDay(venue, date, br):
     soup = scrapingFuncs[venue](br, venue=STG[venue], action='open', month=date[0:2])
@@ -41,7 +48,7 @@ def scrapeVenueDay(venue, date, br):
         print scrapingFuncs[venue](br, date=date, soup=soup, venue=STG[venue])
 
 
-scrapeVenue(12, '01', br)
+scrapeVenue_fullMonth(12, '02', br)
 
 #scrapeVenueDay(12, '0218', br)
 
