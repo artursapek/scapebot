@@ -1296,13 +1296,35 @@ class scapebot():
                         
                         #do price
                         price = soup.find(attrs={'class' : 'aPrice'})
-                        if price != None:
+                        parsedPrice = [ ] 
+                        if price:
                             price = price.renderContents()
-                            if hasBreak in price:
-                                price = price[:price.find("<br")].replace('"', '')
-                                result.append(price)
-                            else:
-                                result.append(price)
+                            dict = None
+                            priceItems = re.findall(r'\$[/\$\w\s]+', price)
+                            for i,x in enumerate(priceItems):
+                                
+                                y = re.findall('\$\w+', x)
+                                if len(y) > 1: # if two prices in one line nigguh
+                                    for ind,n in enumerate(y):
+                                        dict = [ ]
+                                        for p in ['advance', 'day of', 'uw student']:
+                                            if re.search(p, x, re.I):
+                                                dict.append(p)
+                                    print dict
+                                    if dict and 'uw student' in dict:
+                                        for t, r in enumerate(dict):
+                                            if r.find('student') == -1:
+                                                UWindex = t
+                                    parsedPrice.append( (y[0] + '(' + y[1] + 'UW)' + {'advance': 'ADV', 'day of': 'DAYOF'}[dict[UWindex]] if len(dict) > 1 else None) )                                                                              
+                                elif len(y) == 1:
+                                    price = y[0]
+                                    if re.search('advance', x, re.I):
+                                        parsedPrice.append(price + 'ADV')
+                                    if re.search('uw student', x, re.I):
+                                        parsedPrice.append(price + 'UW')
+                                    if re.search('day of show', x, re.I):
+                                        parsedPrice.append(price + 'DAYOF')
+                            result.append(''.join(parsedPrice) if parsedPrice else price)
                         else:
                             result.append("Free")
                             pass
