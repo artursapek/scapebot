@@ -1262,6 +1262,8 @@ class scapebot():
             if month[0] == '0':
                 month = month[1]
             day = date[2:4]
+            if day[0] == '0':
+                day = day[1]
             result = []
             bands = []
             test = ''
