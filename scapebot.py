@@ -295,7 +295,7 @@ class scapebot():
                     if search and len(soup.findAll('h3', text='General Info', attrs={ 'class' : 'moduleHead' })) > 0 and soup.find(attrs={'class':'odd BandGenres'}):
                         sources['Myspace'] = URL
                         soupREPO['Myspace'] = soup
-                        if update != bandname: # MAKE SURE THERE ARE EVEN GENRES FUCK MAN
+                        if update != bandname and not re.search(originalInput, str(soup), re.I):
                             bandname = update
                         break
             except:
@@ -312,7 +312,7 @@ class scapebot():
                     if header.find('song)') == -1 and search and len(soup.findAll('a', href='/wiki/Music_genre')) > 0 and re.search(self.regexifyBandname(bandname), soup.h1.renderContents(), re.I) and '(soundtrack)' not in soup.h1.renderContents() and 'album)' not in soup.h1.renderContents():
                         sources['Wikipedia'] = str(link['href'])
                         soupREPO['Wikipedia'] = soup
-                        if update != bandname:
+                        if update != bandname and not re.search(originalInput, str(soup), re.I):
                             bandname = update
                         break
             except:
@@ -360,7 +360,7 @@ class scapebot():
                     if search and URL.find('search?') == -1:
                         sources['Soundcloud'] = URL
                         soupREPO['Soundcloud'] = soup
-                        if update != bandname:
+                        if update != bandname and not re.search(originalInput, str(soup), re.I):
                             bandname = update
                         break
             except:
@@ -377,7 +377,7 @@ class scapebot():
                     if search and soup.find('Genres') > -1:
                         sources['Facebook'] = URL
                         soupREPO['Facebook'] = soup
-                        if update != bandname:
+                        if update != bandname and not re.search(originalInput, str(soup), re.I):
                             bandname = update
                         break
             except:
@@ -586,7 +586,7 @@ class scapebot():
             except:
                 pass
             try:
-                if not nameFormatted:
+                if not nameFormatted and not re.search(originalInput, str(soup), re.I):
                     bandname = temp.h1.renderContents()[:temp.h1.renderContents().find('\n')]
                     nameFormatted = True
             except:
