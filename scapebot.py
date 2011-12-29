@@ -35,6 +35,22 @@ class scapebot():
                     'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 
                     'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
                     'West Virginia', 'Wisconsin', 'Wyoming' ]
+        global locales
+        locales = [ 'Aberdeen', 'Adams', 'Airway Heights', 'Algona', 'Anacortes', 'Arlington', 'Asotin', 'Auburn', 'Bainbridge Island', 'Battle Ground', 'Bellevue', 'Bellingham', 'Benton', 'Benton City', 'Bingen', 
+                    'Black Diamond', 'Blaine', 'Bonney Lake', 'Bothell', 'Bremerton', 'Brewster', 'Bridgeport', 'Brier', 'Buckley', 'Burien', 'Burlington', 'Camas', 'Carnation', 'Cashmere', 'Castle Rock', 'Centralia', 
+                    'Chehalis', 'Chelan', 'Cheney', 'Chewelah', 'Clallam', 'Clark', 'Clarkston', 'Cle Elum', 'Clyde Hill', 'Colfax', 'College Place', 'Columbia', 'Colville', 'Connell', 'Cosmopolis', 'Covington', 'Cowlitz', 
+                    'Davenport', 'Dayton', 'Deer Park', 'Des Moines', 'Douglas', 'DuPont', 'Duvall', 'East Wenatchee', 'Edgewood', 'Edmonds', 'Electric City', 'Ellensburg', 'Elma', 'Entiat', 'Enumclaw', 'Ephrata', 'Everett', 
+                    'Everson', 'Federal Way', 'Ferndale', 'Ferry', 'Fife', 'Fircrest', 'Forks', 'Franklin', 'Garfield', 'George', 'Gig Harbor', 'Gold Bar', 'Goldendale', 'Grand Coulee', 'Grandview', 'Granger', 'Granite Falls', 
+                    'Grant', 'Grays Harbor', 'Harrington', 'Hoquiam', 'Ilwaco', 'Island', 'Issaquah', 'Jefferson', 'Kahlotus', 'Kalama', 'Kamilche', 'Kelso', 'Kenmore', 'Kennewick', 'Kent', 'Kettle Falls', 'King', 'Kirkland', 
+                    'Kitsap', 'Kittitas', 'Klickitat', 'La Center', 'Lacey', 'Lake Forest Park', 'Lake Stevens', 'Lakewood', 'Langley', 'Leavenworth', 'Lewis', 'Liberty Lake', 'Lincoln', 'Long Beach', 'Longview', 'Lynden', 
+                    'Lynnwood', 'Mabton', 'Maple Valley', 'Marysville', 'Mason', 'McCleary', 'Medical Lake', 'Medina', 'Mercer Island', 'Mesa', 'Mill Creek', 'Milton', 'Monroe', 'Montesano', 'Morton', 'Moses Lake', 'Mossyrock',
+                    'Mount Vernon', 'Mountlake Terrace', 'Moxee', 'Mukilteo', 'Napavine', 'Newcastle', 'Newport', 'Nooksack', 'Normandy Park', 'North Bend', 'North Bonneville', 'Oak Harbor', 'Oakville', 'Ocean Shores', 
+                    'Okanogan', 'Olympia', 'Omak', 'Oroville', 'Orting', 'Othello', 'Pacific', 'Palouse', 'Pasco', 'Pateros', 'Pend Oreille', 'Pierce', 'Pomeroy', 'Port Angeles', 'Port Orchard', 'Port Townsend', 'Poulsbo', 
+                    'Prosser', 'Pullman', 'Puyallup', 'Quincy', 'Rainier', 'Raymond', 'Redmond', 'Renton', 'Republic', 'Richland', 'Ridgefield', 'Ritzville', 'Rock Island', 'Roslyn', 'Roy', 'Royal City', 'Sammamish', 'SeaTac', 
+                    'Seattle', 'Sedro-Woolley', 'Selah', 'Sequim', 'Shelton', 'Shoreline', 'Skagit', 'Skamania', 'Snohomish', 'Snoqualmie', 'Soap Lake', 'South Bend', 'Spokane', 'Spokane Valley', 'Sprague', 'Stanwood', 'Stevens', 
+                    'Stevenson', 'Sultan', 'Sumas', 'Sumner', 'Sunnyside', 'Tacoma', 'Tekoa', 'Tenino', 'Thurston', 'Toledo', 'Tonasket', 'Toppenish', 'Tukwila', 'Tumwater', 'Union Gap', 'University Place', 'Vader', 'Vancouver', 
+                    'Waitsburg', 'Walla Walla', 'Wapato', 'Warden', 'Washougal', 'Wenatchee', 'West Richland', 'Westport', 'Whatcom', 'White Salmon', 'Whitman', 'Winlock', 'Woodinville', 'Woodland', 'Woodway', 'Yakima', 'Yelm',
+                    'Zillah']
 
     def sanitize(self, x): #clean up names which are often not spelled consistently
         for i in range(1, 32):
@@ -750,7 +766,7 @@ class scapebot():
         bannedGenres = ['Experimental', 'Other', 'Vocalist', 'Prog', 'Hard Rock' ,'New\sYork', 'Boston', 'Seattle', 'Canad', 'Post[ -]', 'Singer[ -]Songwriter', 
                         'Ambient', 'Underground', 'Scotland', 'ish', 'Freestyle', 'Good music', 'Regional mexican', 'Chicago', 'Swag', 'Denton', 'Communication', 
                         'Minimalist', 'Australian', '80', '70', 'Music', 'Song', 'Comedy'] # "All music is experimental." - Partick Leonard
-        bannedGenres += states
+        bannedGenres += states + locales
         toRemove = []
 
         # remove any HTML tags that may have made it through
@@ -1066,7 +1082,7 @@ class scapebot():
 
         tR = []
         for i, p in enumerate(phrase):
-            if p.lower() in ['sunday', 'saturday', 'friday', 'thursday', 'wednesday', 'tuesday', 'monday']:
+            if p.lower() in ['sunday', 'saturday', 'friday', 'thursday', 'wednesday', 'tuesday', 'monday', 'special event', 'special guest', 'surprise guest'] or p == '':
                tR.append(p)
         for p in tR:
             phrase.remove(p)
