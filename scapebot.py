@@ -7,6 +7,7 @@ from mechanize import Browser
 from collections import defaultdict
 from datetime import datetime
 #from bandscapeMain.models import *
+from PIL import Image as img
 from random import *
 import csv
 import string
@@ -1048,7 +1049,7 @@ class scapebot():
 
 
 
-    def albumCover(self, bandname, br):
+    def albumCover(self, bandname, br): # swag
         albumGoogleResults = self.Google('site:apple.com itunes %s' % bandname, True)
         breakNow = False
         albumsRepo = { }
@@ -1066,8 +1067,9 @@ class scapebot():
                                 release = albumSoup.find('li', attrs={'class': 'release-date'})
                                 if not re.search('- Single', albumSoup.h1.renderContents()):
                                     year = re.search('20\d\d|19\d\d', release.renderContents()).group(0)
+                                    albumBig = albumSoup.find('a', attrs={'class': 'artwork'})['src']
                                     if not year in albumsRepo:
-                                        albumsRepo[year] = a['src']
+                                        albumsRepo[year] = albumBig
                         breakNow = True
                         break
             except:
@@ -1077,11 +1079,16 @@ class scapebot():
         if albumsRepo:
             pairs = albumsRepo.items()
             pairs.sort()
-            return pairs[-1][1]
-
-
-
-
+            albumSRC = str(pairs[-1][1])
+        if albumSRC:
+            dl = br.retrieve(albumSRC)[0]
+            cover = img.open(dl)
+            dim = cover.size
+            if dim[0] == dim[1]: # if dats a square
+                try:
+                    cover.save('covers/%s/%s.jpg' % (bandname.replace('the ', '')[0], bandname), "JPEG") 
+                except:
+                    print 'error saving'
 
 
 # ----
