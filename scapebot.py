@@ -1074,11 +1074,10 @@ class scapebot():
                 pass
             if breakNow:
                 break
-        pairs = albumsRepo.items()
-        pairs.sort()
-        print pairs
-        print ''
-        print pairs[-1][1]
+        if albumsRepo:
+            pairs = albumsRepo.items()
+            pairs.sort()
+            return pairs[-1][1]
 
 
 
