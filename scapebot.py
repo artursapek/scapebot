@@ -5,6 +5,8 @@
 from BeautifulSoup import BeautifulSoup
 from mechanize import Browser
 from collections import defaultdict
+from datetime import datetime
+#from bandscapeMain.models import *
 from random import *
 import csv
 import string
@@ -50,7 +52,7 @@ class scapebot():
                     'Seattle', 'Sedro-Woolley', 'Selah', 'Sequim', 'Shelton', 'Shoreline', 'Skagit', 'Skamania', 'Snohomish', 'Snoqualmie', 'Soap Lake', 'South Bend', 'Spokane', 'Spokane Valley', 'Sprague', 'Stanwood', 'Stevens', 
                     'Stevenson', 'Sultan', 'Sumas', 'Sumner', 'Sunnyside', 'Tacoma', 'Tekoa', 'Tenino', 'Thurston', 'Toledo', 'Tonasket', 'Toppenish', 'Tukwila', 'Tumwater', 'Union Gap', 'University Place', 'Vader', 'Vancouver', 
                     'Waitsburg', 'Walla Walla', 'Wapato', 'Warden', 'Washougal', 'Wenatchee', 'West Richland', 'Westport', 'Whatcom', 'White Salmon', 'Whitman', 'Winlock', 'Woodinville', 'Woodland', 'Woodway', 'Yakima', 'Yelm',
-                    'Zillah']
+                    'Zillah' ]
 
     def sanitize(self, x): #clean up names which are often not spelled consistently
         for i in range(1, 32):
@@ -133,7 +135,7 @@ class scapebot():
     def regexifyBandname(self, bandname, listIt=False):
         # regexes for flexibility when checking a page for actual mentions of the name ^_^
         questionOut = ['[', ']']
-        change = { 'the ': '(the\s)?', ' ':'([-\s,]?)', ' & ':'(\sand\s|\s&\s)',' and ':'(\sand\s|\s&\s)','DJ ':'(DJ\s)?','dj ':'(dj\s)?',}
+        change = { 'the ': '(the\s)?', ' ':'([-\s,]?)+', ' & ':'(\sand\s|\s&\s)',' and ':'(\sand\s|\s&\s)','DJ ':'(DJ\s)?','dj ':'(dj\s)?',}
         if not listIt:
             for q in questionOut:
                 bandname = bandname.replace(q, q + '?')
@@ -438,7 +440,7 @@ class scapebot():
             except:
                 pass
 
-        print sources
+        #print sources
     
         if 'Wikipedia' in sources:
             wikiINFO = {}
@@ -1046,7 +1048,44 @@ class scapebot():
 
 
 
+    def albumCover(self, bandname, br):
+        albumGoogleResults = self.Google('site:apple.com itunes %s' % bandname, True)
+        breakNow = False
+        albumsRepo = { }
+        result = [ ]
+        for li in albumGoogleResults('li'):
+            try:
+                link = li.div.h3.a
+                if re.search('itunes.apple.com/.*/artist/', link['href']):
+                    soup = BeautifulSoup(br.open(link['href']).read())
+                    if re.search(self.regexifyBandname(bandname), soup.h1.renderContents(), re.I):
+                        albums = soup.findAll('img', attrs={'class': 'artwork'})
+                        for a in albums:
+                            if a['src'].find('/Music/') > -1:
+                                albumSoup = BeautifulSoup(br.open(a.parent.parent['href']).read())
+                                release = albumSoup.find('li', attrs={'class': 'release-date'})
+                                if not re.search('- Single', albumSoup.h1.renderContents()):
+                                    year = re.search('20\d\d|19\d\d', release.renderContents()).group(0)
+                                    if not year in albumsRepo:
+                                        albumsRepo[year] = a['src']
+                        breakNow = True
+                        break
+            except:
+                pass
+            if breakNow:
+                break
+        pairs = albumsRepo.items()
+        pairs.sort()
+        print pairs
+        print ''
+        print pairs[-1][1]
 
+
+
+
+
+
+# ----
 
     def freeBrowser(self):
         br = Browser()
@@ -1054,7 +1093,7 @@ class scapebot():
         br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]
         return br
 
-
+# ----
 
 
 
@@ -1190,7 +1229,7 @@ class scapebot():
                         goToShow = findShow[len(findShow) - 1]
                     else:
                         goToShow = findShow[0]
-                    if not re.search(r'free.*tour', goToShow.renderContents(), re.I):
+                    if not re.search(r'free.*tour', goToShow.renderContents(), re.I) and not re.search(r'special event', goToShow.renderContents(), re.I):
                         bands.append(goToShow.renderContents())
                         #go to next page to find 21+ & price
                         linkText = goToShow.renderContents()
@@ -1651,4 +1690,88 @@ class scapebot():
                 self.randomSentence(band)
         else:
             self.randomSentence(band)
+
+
+
+
+
+
+
+
+    def parseDate(self, month, day):
+        day = str(day)
+        if len(day) == 1:
+            day = '0' + day
+        return month+day
+
+
+    def scrapeVenue_fullMonth(self, venue, month):
+        br = self.freeBrowser()
+        scrapingFuncs = { 1: self.scrapeVenue_neumos, 6: self.scrapeVenue_STG, 7: self.scrapeVenue_STG, 12: self.scrapeVenue_STG,  26: self.scrapeVenue_jazzAlley, 10: self.scrapeVenue_crocodile }
+        STG = { 6: 'paramount', 7: 'moore', 12: 'neptune' }
+        daysMos = { '01': 31, '02': 29, '03': 31, '04': 30, '05': 31, '06': 30, '07': 31, '08': 31, '09': 30, '10': 31, '11': 30, '12': 31 }
+        shows = [ ]
+        soup = scrapingFuncs[venue](br, venue=STG[venue] if venue in STG else venue, action='open', month=month)
+        for i in range(1, daysMos[month]):
+            date = self.parseDate(month, i)
+            show = scrapingFuncs[venue](br, date=date, soup=soup, venue=STG[venue] if venue in STG else venue)
+            if show:
+                    shows.append(show)
+        print shows
+        self.addShows(shows, venue) # chain into the next part which adds em
+
+    def addShows(self, shows, venue):
+        for index, show in enumerate(shows):
+            # first check to see if we already have it
+            alreadyHaveit = Show.objects.filter(venue=venue, date=show[0])
+            if not alreadyHaveit:
+                appendedInfo = ''
+                bands = show[4]
+                newBands = []
+                for i, b in enumerate(bands):
+                    found = False
+                    iterations = self.rBQueries(b)
+                    for y, x in enumerate(iterations): # first check all iterations to see if they be chillin in our DB
+                        s = searchDB = Band.objects.filter(bandname=x)
+                        if len(searchDB) == 1: # if we've found ONE match for the name
+                            newBands.append(searchDB[0].id) # replace that bandname with the ID it has in our DB
+                            found = True
+                            if y > 0:
+                                appendedInfo += '%s:%s' % (str(y), iterations[0].replace(s[0],'')) # add the extra info to the show so we can display it with the artist :)
+                            break
+                    if not found:
+                        for y, x in enumerate(iterations): # when we haven't found it we fucking scrape it
+                            print x
+                            s = scrapeIt = self.researchBand(x)
+                            if scrapeIt:
+                                searchDB = Band.objects.filter(bandname=scrapeIt[0])
+                                if len(searchDB) == 1:
+                                    newBands.append(searchDB[0].id) # replace that bandname with the ID it has in our DB
+                                    found = True
+                                    if y > 0:
+                                        appendedInfo += '%s:%s' % (str(y), iterations[0].replace(s[0],'')) # add the extra info to the show so we can display it with the artist :)
+                                    break
+                                else:
+                                    newBand = Band(bandname=s[0], genre=s[1], origin=s[2])
+                                    newBand.save()
+                                    newBands.append(newBand.id)
+                                    if y > 0:
+                                        appendedInfo += '%s:%s' % (str(y), iterations[0].replace(s[0],'')) # add the extra info to the show so we can display it with the artist :)
+                                    found = True
+                                    break
+                if newBands: # if we found any or all bands (usually it was all or none)
+                    for FUCK, YOU in enumerate(newBands):
+                        newBands[FUCK] = str(YOU)
+                    newShow = Show(venue = venue, date=show[0]+'12', time=show[1], price=show[2], twentyone=show[3], bands=','.join(newBands), bandnameow=appendedInfo if appendedInfo else '')
+                    newShow.save()
+                    print newShow
+
+    def rBQueries(self, query):
+        queries = [ query ]
+        for x in [' with ', ' & ', ' and ', ' - ', ': ']:
+            find = query.find(x)
+            if find > -1:
+                queries.append(query[:find].strip())
+        return queries
+     
 
