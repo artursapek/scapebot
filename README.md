@@ -2,6 +2,8 @@
 
 scapebot is a web crawler dedicated to researching musicians and bands that come through Seattle.
 
+**REQUIRES**: mechanize, BeautifulSoup
+
 For the time being the main function available to the public is `band.research()` which returns information about a band/musician given a name.
 The return format is `[ formatted name, 1 or 2 genres, origin, source of their music(incomplete) ]`
 
