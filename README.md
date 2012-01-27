@@ -23,7 +23,7 @@ For smaller less popular Seattle bands you can use the optional `forceLocal` arg
 [u'LOST DOGMA', 'Country / Americana', 'Seattle', '']
 ```
 
-When choosing genres scapebot compares a longer list he mines during the research and chooses the two most interesting ones based its context in the pool of options.
+When choosing genres scapebot compares a longer list he mines during the research and chooses the two most interesting ones based on the pool of options.
 
 For example, given `['Disco', 'Italiodisco']` he will choose Italiodisco and ignore Disco because it's redundant. Given `['Folk', 'Rock']` he will choose only Folk and ignore Rock as it's a non-descriptive last resort genre.
 
