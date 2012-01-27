@@ -1,0 +1,207 @@
+Aberdeen
+Airway Heights
+Algona
+Anacortes
+Arlington
+Asotin
+Auburn
+Bainbridge Island
+Battle Ground
+Bellevue
+Bellingham
+Benton City
+Bingen
+Black Diamond
+Blaine
+Bonney Lake
+Bothell
+Bremerton
+Brewster
+Bridgeport
+Brier
+Buckley
+Burien
+Burlington
+Camas
+Carnation
+Cashmere
+Castle Rock
+Centralia
+Chehalis
+Chelan
+Cheney
+Chewelah
+Clarkston
+Cle Elum
+Clyde Hill
+Colfax
+College Place
+Colville
+Connell
+Cosmopolis
+Covington
+Davenport
+Dayton
+Deer Park
+Des Moines
+DuPont
+Duvall
+East Wenatchee
+Edgewood
+Edmonds
+Electric City
+Ellensburg
+Elma
+Entiat
+Enumclaw
+Ephrata
+Everett
+Everson
+Federal Way
+Ferndale
+Fife
+Fircrest
+Forks
+George
+Gig Harbor
+Gold Bar
+Goldendale
+Grand Coulee
+Grandview
+Granger
+Granite Falls
+Harrington
+Hoquiam
+Ilwaco
+Issaquah
+Kahlotus
+Kalama
+Kamilche
+Kelso
+Kenmore
+Kennewick
+Kent
+Kettle Falls
+Kirkland
+Kittitas
+La Center
+Lacey
+Lake Forest Park
+Lake Stevens
+Lakewood
+Langley
+Leavenworth
+Liberty Lake
+Long Beach
+Longview
+Lynden
+Lynnwood
+Mabton
+Maple Valley
+Marysville
+McCleary
+Medical Lake
+Medina
+Mercer Island
+Mesa
+Mill Creek
+Milton
+Monroe
+Montesano
+Morton
+Moses Lake
+Mossyrock
+Mountlake Terrace
+Mount Vernon
+Moxee
+Mukilteo
+Napavine
+Newcastle
+Newport
+Nooksack
+Normandy Park
+North Bend
+North Bonneville
+Oak Harbor
+Oakville
+Ocean Shores
+Okanogan
+Olympia
+Omak
+Oroville
+Orting
+Othello
+Pacific
+Palouse
+Pasco
+Pateros
+Pomeroy
+Port Angeles
+Port Orchard
+Port Townsend
+Poulsbo
+Prosser
+Pullman
+Puyallup
+Quincy
+Rainier
+Raymond
+Redmond
+Renton
+Republic
+Richland
+Ridgefield
+Ritzville
+Rock Island
+Roslyn
+Roy
+Royal City
+Sammamish
+SeaTac
+Seattle
+Sedro-Woolley
+Selah
+Sequim
+Shelton
+Shoreline
+Snohomish
+Snoqualmie
+Soap Lake
+South Bend
+Spokane
+Spokane Valley
+Sprague
+Stanwood
+Stevenson
+Sultan
+Sumas
+Sumner
+Sunnyside
+Tacoma
+Tekoa
+Tenino
+Toledo
+Tonasket
+Toppenish
+Tukwila
+Tumwater
+Union Gap
+University Place
+Vader
+Vancouver
+Waitsburg
+Walla Walla
+Wapato
+Warden
+Washougal
+Wenatchee
+Westport
+West Richland
+White Salmon
+Winlock
+Woodinville
+Woodland
+Woodway
+Yakima
+Yelm
+Zillah
