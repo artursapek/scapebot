@@ -7,7 +7,7 @@ required libraries: mechanize, BeautifulSoup
 
 ### band.research(name)
 
-Researching the bands Avi Buffalo and LCD Soundsystem (~30 seconds):
+Researching the bands Avi Buffalo and LCD Soundsystem (~30 seconds each):
 
 ```python
 >>> from scapebot import band
