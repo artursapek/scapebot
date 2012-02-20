@@ -7,12 +7,12 @@ from mechanize import Browser
 from collections import defaultdict
 from datetime import datetime
 from django.utils import simplejson
+from time import sleep
 try: from main.models import *
 except: pass
 try: from PIL import Image as img
 except: pass
 from random import *
-import csv
 import string
 import re
 import os
@@ -76,12 +76,15 @@ class base():
         else: return ''
 
     def cleanText(self, s):
+        s = BeautifulSoup(str(s)) # I think this is necessary
         for tag in s(True):
             tag.replaceWith(tag.renderContents())
         return s.renderContents().strip()
 
 
     def GoogleAPI(self, query, cse):
+        if query == '' or len(query) == 1: # These will fuck it right up and eat API calls
+            return [ ]
         queryURL = query.replace(' ', '%20').lower()
         url = 'https://www.googleapis.com/customsearch/v1?key=AIzaSyDP4MJGp7FRuMnKuF3fJ4PbcmpW7w5rOIc&cx=%s&q=%s' % (cse, queryURL)
         request = urllib2.Request(url, None, { 'Referer': 'bandscape.net' })
@@ -121,10 +124,13 @@ class base():
             suggestion = None
         return suggestion
 
-    
-    # pre: a band name
-    # post: if not listIt: a regex string for bandname.
-
+    def parseListing(self, query):
+        queries = [ query ]
+        for x in [' with ', ' & ', ' and ', ' - ', ': ']:
+            find = query.find(x)
+            if find > -1:
+                queries.append(query[:find].strip())
+        return queries
     
     def freeBrowser(self):
         br = Browser()
@@ -132,18 +138,20 @@ class base():
         br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1')]
         return br
 
-    def regexify(self, bandname, listIt=False):
+    def regexify(self, query, listIt=False):
+        spaceReplace = '[\\[\\]\\(\\)\\s\\.\\,\\-\\.]+?'
+        prefixSuffix = '[\\[\\]\\(\\)\\s\\.\\,\\-]?'
         # regexes for flexibility when checking a page for actual mentions of the name ^_^
-        bandname = bandname.lower().replace(' and ', '(\sand\s|\s&\s|\s&amp;\s)').replace(' & ', '(\sand\s|\s&\s|\s&amp;\s)')
+        query = query.lower().replace(' and ', '(\sand\s|\s&\s|\s&amp;\s)').replace(' & ', '(\sand\s|\s&\s|\s&amp;\s)')
         questionOut = ['[', ']']
-        change = { 'the ': '(the\s)?', 'DJ ':'(DJ\s)?','dj ':'(dj\s)?',' ':'([-\s,\.]?)+' }
+        change = { 'the ': '(the\s)?', 'DJ ':'(DJ\s)?','dj ':'(dj\s)?',' ':spaceReplace}
         if not listIt:
             for q in questionOut:
-                bandname = bandname.replace(q, q + '?')
+                query = query.replace(q, q + '?')
             for c in change:
-                bandname = bandname.replace(c, change[c])
+                query = query.replace(c, change[c])
             r = u''
-            for i in bandname: # take care of unicode chars. shitty metal bands often use special characters to look hardcore
+            for i in query: # take care of unicode chars. shitty metal bands often use special characters to look hardcore
                 if unicode_to_text_Matches.has_key(ord(i)):
                     r += '[' + unicode_to_text_Matches[ord(i)] + i + ']'
                 if text_to_unicode_Matches.has_key(i):
@@ -155,22 +163,22 @@ class base():
                     pass
                 else:
                     r += i
-            return r
+            return '%s%s%s' % (prefixSuffix, r, prefixSuffix)
         else: # if listIt, do the same shit in a different way that allows it to be returned as a list 
             changed = []
-            for i,n in enumerate(bandname):
+            for i,n in enumerate(query):
                 for ind,ch in enumerate(change):
-                    if bandname[i:i + len(ch)] == ch:
-                        culprit = bandname[i:i + len(ch)]
-                        for duba in range(0, bandname.count(culprit)):
-                            w = bandname.find(culprit) # im running out of variables
+                    if query[i:i + len(ch)] == ch:
+                        culprit = query[i:i + len(ch)]
+                        for duba in range(0, query.count(culprit)):
+                            w = query.find(culprit) # im running out of variables
                             if w != -1:
-                                bandname = bandname[:w] + change[ch] + bandname[w + 1:]
+                                query = query[:w] + change[ch] + query[w + 1:]
                                 changed.append([w, len(change[ch])]) # commit
                         # now we have an array like this [[1, 3], [5, 6]] for the fuckin indeces in the string to keep together in the list YO! so we can iterate over them as one. fuckall.
             l = []
             skip = 0
-            for ind,i in enumerate(bandname): # take care of unicode chars. shitty metal bands often use special characters to look hardcore
+            for ind,i in enumerate(query): # take care of unicode chars. shitty metal bands often use special characters to look hardcore
                 r = ''
                 stop = False
                 if skip > 0:
@@ -178,7 +186,7 @@ class base():
                 else:
                     for y,x in enumerate(changed):
                         if ind == changed[y][0]:
-                            l.append(bandname[ind:ind+changed[y][1]])
+                            l.append(query[ind:ind+changed[y][1]])
                             stop = True
                             skip = changed[y][1] - 1
                             changed.pop(y)
@@ -195,9 +203,10 @@ class base():
                             pass
                         else:
                             l.append( i )
+            l.insert(0, prefixSuffix)
+            l.append( prefixSuffix )
+
             return l            # returns as a list. ''.join() this and it's the same shit as above. super dank.
-
-
 
 class band(base):
                    
@@ -220,7 +229,7 @@ class band(base):
                 for x in range(i, i + tolerance):
                     try:
                         if name[x][-1] != '?' or name[x][-2] != '?':
-                            if name[x] != '([-\s,\.]?)+':
+                            if name[x] != '[\\[\\]\\(\\)\\s\\.\\,\\-]+?' and name[x] != '[\\[\\]\\(\\)\\s\\.\\,\\-]?':
                                 name[x] = name[x] + '?\w?' # add a question mark
                     except:
                         pass
@@ -235,31 +244,20 @@ class band(base):
                     pass
         return found, update
 
-    
-    def bandAlreadyScraped(self, bandname):
-        db = open('bandsScraped.txt', 'rb')
-        lines = db.readlines()
-        if bandname not in lines:
-            db.close()
-            db = open('bandsScraped.txt', 'a')
-            db.write('\n' + bandname)
-            db.close()
-            x = False
-        else:
-            x = True
-        return x
-
-
 
     
     def getSourceURLS(self, bandname, forceLocal):
-        print bandname, forceLocal
+        print bandname, '...'
         x = None
         try:
-            x = self.GoogleAPI('"' + bandname + (' seattle' if forceLocal else '') + '"', '014750848680997063315:ienipxcmxo8')
+            x = self.GoogleAPI(bandname + (' seattle' if forceLocal else ''), '014750848680997063315:ienipxcmxo8')
         except:
-            self.getSourceURLS(bandname, forceLocal)
+            pass
         if x == None:
+            print 'API returned nothing! Waiting 5 seconds...'
+            sleep(5) # WAIT A FEW SECONDS BEFORE YOU TRY AGAIN OR THE API GETS EATEN UP AND I LOST LIKE 3 DOLLARS FOR NOTHING
+                     # UGH
+            print 'Trying again. Query: %s ' % bandname 
             self.getSourceURLS(bandname, forceLocal)
         else:            
             return x
@@ -268,50 +266,36 @@ class band(base):
     # post: [ band name, [ genre, genre ], origin, albumcover_src ]
     # * never input ignoreSuggest yourself, this is for recursion
     
-    def research(self, bandname, save = False, forceLocal = False, ignoreSuggest = False, sources = {}):
+    def research(self, bandname, save = False, raw = False, forceLocal = False, givenSources = {}):
+        if bandname == '' or len(bandname) == 1:
+            print 'ERROR: bad or empty name'
+            return None
+        sources = {}
+        for g in givenSources:
+            sources[g] = givenSources[g]
         nameFormatted = False
         GENRES = TRUSTWORTHY_GENRES = []
-        ALBUMCOVER = alternate = results = None
+        ALBUMCOVER = results = None
         originalInput = bandname
         soupREPO = wikiINFO = lastfmINFO = soundcloudINFO = bandcampINFO = facebookINFO = myspaceINFO = reverbnationINFO = {}
         
         # Break a few eggs
         br = self.freeBrowser()
-        # see if Google thinks the name is misspelled
-        query = bandname
-        if forceLocal: query += ' Seattle'
-        suggestion = self.GoogleSuggest(query)
-
-        # R E C U R S I O N ~~~~~ *****
-        if not ignoreSuggest:
-            if suggestion: # so, here we have two possibilities: the venue made a typo, or the band picked a similar name to a more popular band. 
-                           # let's try giving the venue the benefit of the doubt and rerun with ignore set to False
-                alternate = self.researchBand(bandname, forceLocal, ignoreSuggest = True)
-
-                          
-        # ok now that that shit is figured out, let's continue with the fixed band name
-        # be more specific with search when dealing with Myspace and Wiki - they're not musician-specific
-
-        if alternate:
-            return alternate
-        if not ignoreSuggest:
-            if suggestion:
-                x = len(bandname.split())
-                bandname = ' '.join(suggestion.split()[0:x])
-
 
         # Do a Google custom search for bandcamp, wikipedia, myspace, reverbnation, lastfm, facebook, and soundcloud pages the band might own.
         sourceURLS = self.getSourceURLS(bandname, forceLocal)
 
-        print sourceURLS
 
         # Investigate each source URL, commit it to sources if it passes the check. While we're at it, we also update the band name if it was misspelled.
         # If validation passes, commit it to memory.
 
         # MYSPACE
         myspaceINFO = { }
-        for URL in filter(lambda k: 'myspace.com' in k, sourceURLS):
+        urls = filter(lambda k: 'myspace.com' in k, sourceURLS)
+        urls.reverse()
+        for URL in urls:
             try:
+                URL = re.search('.*.com/[^/]*', URL).group(0)
                 soup = BeautifulSoup(br.open(URL).read())
                 header = soup.findAll('h1')[1]
                 search, update = self.flexibleComparison(bandname, header.renderContents())
@@ -326,7 +310,9 @@ class band(base):
 
         # WIKIPEDIA
         wikiINFO = { }
-        for URL in filter(lambda k: 'wikipedia.org' in k, sourceURLS):
+        urls = filter(lambda k: 'wikipedia.org' in k and not re.search('album|File:', k), sourceURLS)
+        urls.reverse()
+        for URL in urls:
             try:
                 soup = BeautifulSoup(br.open(URL).read())
                 header = soup.h1.renderContents()
@@ -342,26 +328,30 @@ class band(base):
 
         # BANDCAMP
         bandcampINFO = { }
-        for URL in filter(lambda k: 'bandcamp.com' in k, sourceURLS):
+        urls = filter(lambda k: 'bandcamp.com' in k, sourceURLS) # No regex required for bcamp
+        urls.reverse()
+        for URL in urls:
             URL = re.search('.*\.com', URL).group(0) + '/releases'
             try:
                 soup = BeautifulSoup(br.open(URL).read())
                 byline = soup.findAll('span', attrs={'itemprop': 'byArtist'})[0]
                 for a in byline('a'):
                     a.replaceWith(a.renderContents())
-                byline = bl = str(byline.renderContents()).replace('\n', '').strip()
-                r = re.search(self.regexify(bandname), bl, re.I)
+                byline = bl = byline.renderContents().replace('\n', '').strip()
+                r = re.search(self.regexify(bandname), bl, re.I) # 
                 bl = bl[bl.find(r.group(0)):].split()
                 if r and len(bandname.split()) == len(bl) and abs(len(byline) - len(bandname) <= 4):
                     sources['Bandcamp'] = URL
-                    soupREPO['Bandcamp'] = soup                        
+                    soupREPO['Bandcamp'] = soup
                     break
             except:
                 pass
 
         # SOUNDCLOUD
         soundcloudINFO = { }
-        for URL in filter(lambda k: 'soundcloud.com' in k, sourceURLS):
+        urls = filter(lambda k: 'soundcloud.com' in k, sourceURLS)
+        urls.reverse()
+        for URL in urls:
             try:
                 URL = re.search('.*.com/[^/]*', URL).group(0)
                 soup = BeautifulSoup(br.open(URL).read())
@@ -378,9 +368,11 @@ class band(base):
 
         # FACEBOOK
         facebookINFO = { }
-        for URL in filter(lambda k: 'facebook.com' in k, sourceURLS):
+        urls = filter(lambda k: 'facebook.com' in k, sourceURLS)
+        urls.reverse()
+        for URL in urls:
             try:
-                URL += '?sk=info'
+                URL = re.search('.*.com/[^/]*', URL).group(0) + '?sk=info'
                 soup = br.open(URL).read()
                 search, update = self.flexibleComparison(bandname, soup)
                 if search and soup.find('Genres') > -1:
@@ -392,12 +384,13 @@ class band(base):
             except:
                 pass
 
-
         # LAST.FM
         lastfmINFO = { }
-        for URL in filter(lambda k: 'last.fm/music/' in k, sourceURLS):
+        urls = filter(lambda k: 'last.fm/music/' in k, sourceURLS)
+        urls.reverse()
+        for URL in urls:
             try:
-                print URL
+                URL = re.search('.*.fm/music/[^/]*', URL).group(0)
                 source = br.open(URL).read()
                 soup = BeautifulSoup(source)
                 search, update = self.flexibleComparison(bandname, soup)
@@ -413,9 +406,11 @@ class band(base):
 
         # REVERBNATION
         reverbnationINFO = { }
-        for URL in filter(lambda k: 'reverbnation.com' in k and '/show/' not in k, sourceURLS):
+        urls = filter(lambda k: 'reverbnation.com' in k, sourceURLS)
+        urls.reverse()
+        for URL in urls:
             try:
-                print URL
+                URL = re.search('.*.com/[^/]*', URL).group(0)
                 source = br.open(URL).read()
                 soup = BeautifulSoup(source)
                 search, update = self.flexibleComparison(bandname, soup)
@@ -429,7 +424,7 @@ class band(base):
                 pass
     
         
-        if 'Wikipedia' in sources:
+        if 'Wikipedia' in soupREPO:
             soup = soupREPO['Wikipedia']
             try:
                 possibleName = self.massRemove(soup.h1.renderContents(), [' (musician)', ' (band)', ' (rock band)', 'User:', ' (singer)'])
@@ -444,19 +439,14 @@ class band(base):
             except:
                 pass
             try:
-                genreInfo = soup.findAll('th', text='Genres')[0].parent.parent.parent.td
-                for tag in genreInfo(True):
-                    tag.replaceWith(tag.renderContents())
-                genres = genreInfo.renderContents().split(', ')
-                if genres[0].find('\n') > -1 and len(genres) == 1:
-                    genres = re.sub('\n', ', ', genres[0]).split(', ')
+                genres = [g.renderContents() for g in soup.findAll('th', text='Genres')[0].parent.parent.parent.td.findAll('a', attrs={'href': re.compile('/wiki/.*')})]
                 genres = self.cleanGenres(genres, bandname)
                 wikiINFO['Genre'] = genres  
                 GENRES += genres
             except:
                 pass
 
-        if 'Last.fm' in sources:
+        if 'Last.fm' in soupREPO:
             try:
                 lastfmINFO = {}
                 soup = soupREPO['Last.fm']
@@ -481,7 +471,6 @@ class band(base):
                         bandname = soup[nameMeta + 16:]
                         bandname = bandname[:bandname.index('</h1>')]
                         nameFormatted = True
-                        print 'lastm'
                     genres = self.cleanGenres(genres, bandname)
                     GENRES += genres                    
                     TRUSTWORTHY_GENRES += genres
@@ -506,7 +495,7 @@ class band(base):
             except:
                 pass
 
-        if 'Soundcloud' in sources:
+        if 'Soundcloud' in soupREPO:
             soundcloudINFO = {'Genres': []}
             soup = soupREPO['Soundcloud']
 
@@ -526,11 +515,10 @@ class band(base):
                 if not nameFormatted and not re.search(originalInput, str(soup), re.I):
                     bandname = temp.h1.renderContents()[:temp.h1.renderContents().find('\n')]
                     nameFormatted = True
-                    print 'sc'
             except:
                 pass
 
-        if 'Myspace' in sources:
+        if 'Myspace' in soupREPO:
             myspaceINFO = {}
             soup =  soupREPO['Myspace']
             try:    
@@ -550,7 +538,7 @@ class band(base):
             except:
                 pass
 
-        if 'ReverbNation' in sources:
+        if 'ReverbNation' in soupREPO:
             reverbnationINFO = {}
             soup = soupREPO['ReverbNation']
             try:
@@ -573,7 +561,7 @@ class band(base):
                 except:
                     pass
 
-        if 'Facebook' in sources: # doesn't use BeautifulSoup because Facebook compiles really fucking weird
+        if 'Facebook' in soupREPO: # doesn't use BeautifulSoup because Facebook compiles really fucking weird
             facebookINFO = {}
             soup = soupREPO['Facebook']
             ht = soup.find('Hometown</th>')
@@ -593,53 +581,49 @@ class band(base):
                     header = header[:header.find(' | Facebook')]
                     bandname = header.replace(' - Info', '')
                     nameFormatted = True
-                    print 'fb'
 
-        if 'Bandcamp' in sources:
-            temp = []
-            tagsFound = None
+        if 'Bandcamp' in soupREPO:
             bandcampINFO = {}
             soup = soupREPO['Bandcamp']
-            tags = soup.findAll('dd', attrs={ 'class' : 'tralbumData' })
-            if len(tags) > 0:
-                for tagsPossible in tags:
-                    if 'tags:' in tagsPossible.renderContents():
-                        tagsFound = tagsPossible
-                        break
-                if tagsFound:
-                    for a in tagsFound('a'):
-                        temp.append(a.renderContents())
-                    x = 1
-                    if temp[len(temp) - 1].split(' ')[0][0].isupper():
-                        bandcampINFO['Origin'] = temp[len(temp) - 1]
-                        x = 2
-                    bandcampINFO['Genres'] = temp[:len(temp) - x]
-                    GENRES += self.cleanGenres(bandcampINFO['Genres'], bandname)
-                    if not nameFormatted:
-                        namesection = soup.findAll('dl', attrs={ 'id' : 'name-section' })[0]
-                        artistname = namesection.span
-                        for a in artistname('a'):
-                            a.replaceWith(a.renderContents())
-                        bandname = artistname.renderContents().split()
-                        changeIt = True
-                        for index, word in enumerate(bandname):
-                            if not changeIt: break
-                            for char in word:
-                                if char.isupper():
-                                    changeIt = False
-                                    break
-                        if changeIt:
-                            for index, word in enumerate(bandname):
-                                bandname[index] = string.capitalize(word)
-                        bandname = ' '.join(bandname)
-                        nameFormatted = True
+            tags = [a.renderContents() for a in soup.findAll('a', attrs={ 'href' :re.compile('.*.com/tag/.*') })]
+            x = 1
+            if tags:
+                possibleOrigin = tags[-1]
+                if possibleOrigin[0].isupper():
+                    bandcampINFO['Origin'] = possibleOrigin
+                    x = 2
+                if len(tags) == 2 and len(tags[0].split(' ')) > 3:
+                    bandcampINFO['Genres'] = tags[0].split(' ')
+                elif len(tags) > 0:
+                    bandcampINFO['Genres'] = tags[:len(tags) - x]
+                GENRES += self.cleanGenres(bandcampINFO['Genres'], bandname)
+            if not nameFormatted:
+                namesection = soup.findAll('div', attrs={ 'id' : 'name-section' })[0]
+                artistname = namesection.span
+                for a in artistname('a'):
+                    a.replaceWith(a.renderContents())
+                bandname = artistname.renderContents().split()
+                changeIt = True
+                for index, word in enumerate(bandname):
+                    if not changeIt: break
+                    for char in word:
+                        if char.isupper():
+                            changeIt = False
+                            break
+                if changeIt:
+                    for index, word in enumerate(bandname):
+                        bandname[index] = string.capitalize(word)
+                bandname = ' '.join(bandname)
+                nameFormatted = True
             # ALBUM COVER
-            ALBUMCOVER = soup.find('a', attrs={'href': '/no_js/show_tralbum_art'}).img['src']
-            
+            try:
+                ALBUMCOVER = soup.find('a', attrs={'href': '/no_js/show_tralbum_art'}).img['src']
+            except: pass    
+
 
         # Site scraping is complete. Not let's parse the data! *:^)-)-<
 
-        print sources
+#        print sources
 
         if not nameFormatted: # if we never got to format the name from one of their pages, just capitalize it all by default
             bandname = string.capwords(bandname)
@@ -657,7 +641,7 @@ class band(base):
                 GENRES.remove(genre)
 
         INFO[1] = self.chooseGenres(GENRES)
-
+        
         originSrcs = [wikiINFO, lastfmINFO, soundcloudINFO, bandcampINFO, facebookINFO, reverbnationINFO, myspaceINFO]
         for src in originSrcs:
             if INFO[2] == '' and 'Origin' in src:
@@ -667,33 +651,35 @@ class band(base):
 
         # final all-encompassing quality control
         INFO[0] = INFO[0].strip()
-        if type(INFO[1]) == list:
-            for i, g in enumerate(INFO[1]):
-                INFO[1][i] = g.strip()
-        elif type(INFO[1]) == str:
+        if type(INFO[1]) == str:
             INFO[1] = INFO[1].strip()
         INFO[2] = INFO[2].strip()
         if len(INFO[2]) == 2:
             INFO[2] = INFO[2].upper() # state/country initials
         INFO[0] = INFO[0].decode('utf-8')
         if save:
-            g = self.get(bandname)
-            if not g:
-                b = Band(bandname=INFO[0], genre=INFO[1], origin=INFO[2], listen=INFO[3])
+            b = self.get(bandname)
+            if not b:
+                b = Band(name=INFO[0], genre=INFO[1], origin=INFO[2])
+                for s in sources:
+                    setattr(b, s.lower().replace('.',''), sources[s]) # Save the sources :)
                 b.save()
-                if ALBUMCOVER:
-                    self.cover(b.id, src=ALBUMCOVER)
                 return b
             else:
-                g.bandname = INFO[0]
-                g.genre = INFO[1] 
-                g.origin = INFO[2]
-                g.listen = INFO[3]
-                g.save()
-                if ALBUMCOVER:
-                    self.cover(g.id, src=ALBUMCOVER)
-                return g
-        return INFO
+                b.bandname = INFO[0]
+                b.genre = INFO[1] 
+                b.origin = INFO[2]
+                for s in sources:
+                    setattr(b, s.lower().replace('.',''), sources[s])
+                b.save()
+                return b
+            if ALBUMCOVER:
+                self.cover(src=ALBUMCOVER, band=b)
+        if raw:
+            b = {'name': INFO[0], 'genre': INFO[1], 'origin': INFO[2], 'sources': [s for s in sources.itervalues()]}
+            return b
+
+        return INFO, sources
         # ta-dah!
 
 
@@ -718,7 +704,7 @@ class band(base):
     def cleanGenres(self, genres, bandname): # standardize the likely spam-filled list of genres collected from all sources into a meaningful pair which will be displayed on the page
         bannedGenres = ['Experimental', 'Other', 'Vocalist', 'Prog', 'Hard Rock' ,'New\sYork', 'Boston', 'Seattle', 'Canad', 'Post[ -]', 'Singer[ -]Songwriter', 
                         'Ambient', 'Underground', 'Scotland', 'ish', 'Freestyle', 'Good music', 'Regional mexican', 'Chicago', 'Swag', 'Denton', 'Communication', 
-                        'Minimalist', 'Australian', '80', '70', 'Music', 'Song', 'Comedy', 'Interview', 'Talk Radio', 'Talk', 'Los angeles'] # "All music is experimental." - Partick Leonard
+                        'Minimalist', 'Australian', '80', '70', 'Music', 'Song', 'Comedy', 'Interview', 'Talk Radio', 'Talk', 'Los angeles', 'Live'] # "All music is experimental." - Partick Leonard
         bannedGenres += states + locales
         toRemove = []
 
@@ -792,6 +778,14 @@ class band(base):
 
     
     def chooseGenres(self, genres):
+#        print genres
+
+        g = []
+        for genre in genres:
+            if genre != '':
+                g.append(genre)
+        genres = g
+
         workingList = []
         overlaps = []
         done = False
@@ -826,7 +820,7 @@ class band(base):
             if overlaps.count(genre) > 1:
                 overlaps.remove(genre)
 
-        #print 'rest', rest, 'overlaps', overlaps
+#        print 'rest', rest, 'overlaps', overlaps
         
         # stage 1: 
         if overlaps:
@@ -846,6 +840,7 @@ class band(base):
                     workingList.append(genre)
                     done = True
                     break
+#        print workingList
         # stage 2: we have shit to work with so let's work with it
         if not done:
             if rest:
@@ -856,7 +851,7 @@ class band(base):
                     workingList.append(rest.pop(0))
                 else:
                     pass
-            
+#        print workingList    
             
 
         # replacements that wont fuck with how things are chosen
@@ -887,8 +882,7 @@ class band(base):
                         'SF', 'Minneapolis': 'Minneapolis', 'Vancouver, BC': 'Vancouver, BC', 'New York City|New York, New York': 'NYC'}
         # neighborhoods and places known by name alone. so far just CA and NYC ,'>/
         #            NYC:                                                                                      CA:
-        thatsIt = [ 'Brooklyn', 'Yonkers', 'Manhattan', 'The Bronx', 'Queens', 'Staten Island', 'Long Island', 'Berkeley', 'Long Beach', 'Echo Park', 'Orange County', 'Compton', 'Watts',
-                    'Providence' ] 
+        thatsIt = [ 'Brooklyn', 'Yonkers', 'Manhattan', 'The Bronx', 'Queens', 'Staten Island', 'Long Island', 'Berkeley', 'Long Beach', 'Echo Park', 'Orange County', 'Compton', 'Watts', 'Providence' ] 
         # No postal codes!
         states = { 'Mississippi': 'MS', 'Oklahoma': 'OK', 'Wyoming': 'WY', 'Minnesota': 'MN', 'Alaska': 'AK', 'Illinois': 'IL', 'Arkansas': 'AR', 'New Mexico': 'NM', 'Indiana': 'IN', 'Maryland': 'MD', 
                     'Louisiana': 'LA', 'Texas': 'TX', 'Iowa': 'IA', 'Wisconsin': 'WI', 'Arizona': 'AZ', 'Michigan': 'MI', 'Kansas': 'KS', 'Utah': 'UT', 'Virginia': 'VA', 'Oregon': 'OR', 'Connecticut': 'CT', 
@@ -941,13 +935,22 @@ class band(base):
                 if index != stateInd:
                     origin[index] = string.capwords(word)
             origin = ', '.join(origin)
-            r = re.search(',? united states', origin, re.I)
-            if r: origin = origin.replace(r.group(0), '')
-            r = re.search(',?\s?u.?[sn].?\s?', origin, re.I)
+            r = re.search(',?\s?united states', origin, re.I)
             if r: origin = origin.replace(r.group(0), '')
             r = re.search(', Please Select Your Region', origin, re.I)
             if r: origin = origin.replace(r.group(0), '')
+
+            
+            origin = origin.strip()
+
+            # check for abbreviation
+            r = re.match('(?P<a>\w+)[\s,]+(?P<b>\w\w)$', origin)
+            if r:
+                if r.group('b').lower() != 'us':
+                    origin = origin.replace(r.group('b'), r.group('b').upper())
         return origin
+
+
 
 
     def get(self, choice):
@@ -960,7 +963,7 @@ class band(base):
             else:
                 return None
         elif type(choice) == str:
-            band = Band.objects.filter(bandname__iexact=choice)
+            band = Band.objects.filter(name__iexact=choice)
             if len(band) == 1:
                 return band[0]
             else:
@@ -975,31 +978,29 @@ class band(base):
         try: g = band.genre
         except: g = ''
         if genre == None and origin == None and cover == None:
-            return [band.id, band.bandname, g, o, c]
+            return [band.id, band.name, g, o, c]
         else:
             band.genre = genre if genre != None else g
             band.origin = origin if origin != None else o
             band.cover = cover if cover != None else c
             band.save()
-            return [band.id, band.bandname, band.genre, band.origin, band.cover]
+            return [band.id, band.name, band.genre, band.origin, band.cover]
 
-    def cover(self, choice, src=None): # swag
-        print choice, src
+    def cover(self, choice=None, src=None, band=None): # swag
         br = self.freeBrowser()
-        if not choice:
+        if not choice and not band:
             return None
-        band = self.get(choice)        
-#        if not os.path.exists('main/static/img/covers/%s/%s__.jpg' % (bandname.lower().replace('the ', '')[0], ''.join(re.findall('\w', bandname)).lower()) ):
+        band = self.get(choice) if choice else band       
         if not src:
             breakNow = False
             albumsRepo = { }
             result = [ ]
             albumSRC = ''
-            URL = filter(lambda f: '/' + band.bandname.lower().replace(' ', '-') + '/' in f, self.GoogleAPI(band.bandname, '014750848680997063315:uwrdxv39alm'))[0]
+            URL = filter(lambda f: '/' + band.name.lower().replace(' ', '-') + '/' in f, self.GoogleAPI(band.name, '014750848680997063315:uwrdxv39alm'))[0]
             print URL
             if URL:
                 soup = BeautifulSoup(br.open(URL).read())
-                if re.search(self.regexify(band.bandname), soup.h1.renderContents(), re.I):
+                if re.search(self.regexify(band.name), soup.h1.renderContents(), re.I):
                     albums = soup.findAll('img', attrs={'class': 'artwork'})
                     for a in albums:
                         if a['src'].find('/Music/') > -1:
@@ -1031,9 +1032,9 @@ class band(base):
             dl = br.retrieve(albumSRC)[0]
             cover = img.open(dl)
             cover.thumbnail( ( 170, 170), img.ANTIALIAS)
-            cover.save('/home/bandscape/dev/bandscape/main/static/img/covers/%s/%s.jpg' % (band.bandname.lower().replace('the ', '')[0], ''.join(re.findall('\w', band.bandname)).lower()), "JPEG", quality=90) 
+            cover.save('/home/bandscape/dev/bandscape/main/static/img/covers/%s/%s.jpg' % (band.name.lower().replace('the ', '')[0], ''.join(re.findall('\w', band.name)).lower()), "JPEG", quality=90) 
             cover.thumbnail( ( 60, 60), img.ANTIALIAS)
-            cover.save('/home/bandscape/dev/bandscape/main/static/img/covers/%s/%s__.jpg' % (band.bandname.lower().replace('the ', '')[0], ''.join(re.findall('\w', band.bandname)).lower()), "JPEG", quality=90) 
+            cover.save('/home/bandscape/dev/bandscape/main/static/img/covers/%s/%s__.jpg' % (band.name.lower().replace('the ', '')[0], ''.join(re.findall('\w', band.name)).lower()), "JPEG", quality=90) 
             return
 
 
@@ -1049,9 +1050,11 @@ class venue(base):
 
     def scrape(self, venue, date): # Usage: venue.scrape(12, '0208') scrapes Neptune Theater for Feb 8
         br = self.freeBrowser()
-        return getattr(self, 'scv_' + ('M_' if len(date) <= 2 else '') + str(venue))(date, br) # Venue scraping functions are named with their id. scv_1 is Neumos, so scv_1('0214') gets the show (or None) for Neumos on Valentines day 
-    # 1                                                                                          An extra _M denotes is an efficient function for the entire month, so scv_M_1('02') gets Neumos' shows for February
-    # Neumos                                                                                     Return format for a show: [ showID, venueID, Date, Time, Price, 21+, Bands ]
+        S = getattr(self, 'scv_' + ('M_' if len(date) <= 2 else '') + str(venue))(date, br)   # Venue scraping functions are named with their id. scv_1 is Neumos, so scv_1('0214') gets the show (or None) for Neumos on Valentines day 
+        return [ {'venue': s[0], 'date': s[1], 'time': s[2], 'price': s[3],                   # An extra _M denotes is an efficient function for the entire month, so scv_M_1('02') gets Neumos' shows for February
+                 'twentyone': s[4], 'bands': s[5], 'tickets': s[6]} for s in filter(lambda x: type(x) == list, S) ]
+    # 1                
+    # Neumos
    
     def scv_1(self, date, br):
         month, day = self.splitDate(date) 
@@ -1064,7 +1067,7 @@ class venue(base):
                 break
         if len(entry.findAll('a')) > 0: 
             soup = BeautifulSoup(br.open('/%s' % entry.a['href']).read())
-            return self.parse_1(soup.find(attrs={'class': 'ShowParagraph'}), date)
+            return [self.parse_1(soup.find(attrs={'class': 'ShowParagraph'}), date)]
         else:
             return None # No <a> tag means there is no show that day
 
@@ -1091,8 +1094,9 @@ class venue(base):
         if len(date) == 2:
             date += show.find(attrs={'class': 'date'}).renderContents().split('.')[2]
 
+        bands = [a.renderContents() for a in info.findAll('a', attrs={'href': re.compile('neumos.php\?bandid.*')})]
+
         info = self.cleanText(info)
-        bands = self.search(r'presents?:\s.[^\t]*', info).split(',')[1:]
 
         price = self.search(r'\$\d+|Free', info)
         time = self.search(r'[\d:]+pm', info)
@@ -1148,16 +1152,105 @@ class venue(base):
         t = show.find('a', href=re.compile(r'.*tickets.*'))
         ticketsLink = self.search(r'.*showboxmarket', t['href']) if t else ''
         return [id, self.fullDate(date), time, price, twentyOne, bands, ticketsLink]
+       
+    # 16
+    # Chop Suey
+
+    def scv_16(self, date, br):
+        m, d = self.splitDate(date)
+        soup = BeautifulSoup(br.open('http://www.chopsuey.com/2012%' + '20%s.html' % date[0:2]).read()) # No fucking clue why their URL is structured this way but it is
+        calendar = soup.find(attrs={'id': 'month'})
+        for td in calendar('td'):
+            try:
+                if td.find(attrs={'class': 'date'}).renderContents() == str(d):
+                    break
+            except: pass
+        return [self.parse_16(date, td)]
+
+    def scv_M_16(self, month, br):
+        shows = [ ]
+        soup = BeautifulSoup(br.open('http://www.chopsuey.com/2012%' + '20%s.html' % month).read())
+        calendar = soup.find(attrs={'id': 'month'})
+        for td in calendar('td'):
+            b = td.find(attrs={'class': 'bands'})
+            if b and b.renderContents():
+                date = self.parseDate(month, td.find(attrs={'class':'date'}).renderContents())
+                shows.append(self.parse_16(date, td))
+        return shows
+
+    def parse_16(self, date, show):
+        try:
+            presents = show.find(attrs={'class':'presents'}).renderContents()
+            if 'Komedy' in presents: return None # Sometimes there's this comedy group that does standup at Chop Suey. Catch this and ignore.
+        except: pass
+        t = show.find(attrs={'class':'time'}).renderContents()
+        twentyOne = True if '21+' in t else False
+        time = self.search('\d+pm', t)
+        t = show.find(attrs={'class':'tix'})
+        if t.find('a'):
+            ticketsLink = t.find('a')['href']
+        else:
+            ticketsLink = None
+        price = self.search('\$\w+', t.renderContents())
+        if 'tba' in price:
+            price = None
+        elif 'adv' in price and price.count('$') == 1:
+            price = self.search('\$\d+', price)
+        bands = [show.find(attrs={'class':'headliner'}).renderContents()]
+        for b in show.find(attrs={'class':'bands'}).renderContents().split('<br />'): # The way they format it is so wild and unpredictable, it would be best to just capture the raw text 
+            bands.append(b)                                                           # and use a bottle-neck parser in the parent function for this shit. EX: 'w/' 'feat.' 'WITH' '[nothing]'
+        bands = self.cleanList(bands)
+        return [16, date, time, price, twentyOne, bands, ticketsLink] # Fuck.
+
+    # 21
+    # Tractor Tavern
+
+    def scv_21(self, date, br):
+        m, d = self.splitDate(date)
+        soup = BeautifulSoup(br.open('http://www.tractortavern.com/calendar.asp?date=%s/3/2012' % m).read())
+        calendar = soup.find(attrs={'id': 'Table4'})
+        for td in calendar('td'):
+            try:
+                if td.font.b.renderContents() == str(d):
+                    break
+            except: pass
+        print [self.parse_21(date, td)]
+
+    def scv_M_21(self, month, br):
+        shows = [ ]
+        soup = BeautifulSoup(br.open('http://www.tractortavern.com/calendar.asp?date=%s/3/2012' % int(month)).read())
+        calendar = soup.find(attrs={'id': 'Table4'})
+        for td in calendar('td'):
+            if td.find('font'):
+                try:
+                    date = self.parseDate(month, td.font.b.renderContents())
+                    shows.append(self.parse_21(date, td))
+                except: pass
+        return shows
+
+    def parse_21(self, date, show):
+        time = self.search('[\d:]+pm', str(show.find('font', text=re.compile('Time:.*'))))
+        price = self.search('\$[^~]*', str(show.find('font', text=re.compile('Charge:.*'))))
+        ps = price.split('/')
+        if len(ps) == 2:
+            if 'adv' in ps[0] and 'dos' in ps[1]:
+                ps = re.findall('\$\d+', price)
+                price = '%sADV%sDAYOF' % (ps[0], ps[1])
+        tL = show.find('font', text='Buy Tickets').parent.parent.parent
+        ticketsLink = tL['href'] if tL else None
+        bands = self.cleanList([re.search('[^a-z~\(\)]*', div.a.renderContents()).group(0).replace(' - ','') for div in show.findAll('div', attrs={'class': 'padding-item'})])
+        return [21, date, time, price, True, bands, ticketsLink]
         
+
     # 24
     # Blue Moon Tavern
 
     def scv_24(self, date, br):
         soup = BeautifulSoup(br.open('http://bluemoonseattle.wordpress.com/').read())
-        m, d = date[0:2], date[2:4]
+        m, d = self.splitDate(date)
         entry = soup.find('span', text=re.compile(r'....%s\.%s' % (m, d))).parent.parent
         bands = entry.nextSibling.nextSibling.findAll('span')
-        return self.parse_24(date, entry, bands)
+        return [self.parse_24(date, entry, bands)]
 
     def scv_M_24(self, month, br):
         shows = [ ]
@@ -1190,7 +1283,7 @@ class venue(base):
             time = sT.group(0)
         else:
             time = None
-        return [24, self.fullDate(date), time, price, True, self.cleanList([b.findAll(text=True)[0] for b in bands]) ]
+        return [24, self.fullDate(date), time, price, True, self.cleanList([b.findAll(text=True)[0] for b in bands]), None]
        
     # 30
     # Seamonster Lounge
@@ -1201,7 +1294,7 @@ class venue(base):
         for entry in soup.findAll(attrs={'class': 'day-with-date'}):
             if int(entry.span.renderContents()) == int(d):
                 break
-        return self.parse_30(date, entry)
+        return [self.parse_30(date, entry)]
     
     def scv_M_30(self, month, br):
         shows = [ ]
@@ -1221,8 +1314,60 @@ class venue(base):
         if 'MCTUFF TRIO' in bands:
             bands = ['McTuff Trio']
         
-        return [30, date, time, 'Free', True, bands]
-            
+        return [30, date, time, 'Free', True, bands, None]
+           
+    # 40
+    # Egan's Ballard Jamhouse
+
+    def scv_40(self, date, br):
+        m, d = self.splitDate(date)
+        soup = BeautifulSoup(br.open('http://www.ballardjamhouse.com/schedule.html').read())
+        for show in soup('dt'):
+            if show.renderContents()[4:] == '%s %s' % (months3[m - 1], d):
+                break
+        show = show.parent
+        dds = show.findAll('dd')
+        if len(dds) > 1:
+            result = [ ]
+            for dd in dds:
+                result.append([self.parse_40(date, dd)])
+            return result
+        else:
+            return [self.parse_40(date, show.dd)]
+    
+    def scv_M_40(self, month, br):
+        shows = [ ]
+        soup = BeautifulSoup(br.open('http://www.ballardjamhouse.com/schedule.html').read())
+        for show in soup('dt'):
+            if show.renderContents()[4:7] == '%s' % months3[int(month) - 1]:
+                d = show.renderContents()[4:].split(' ')
+                date = self.parseDate(months3.index(d[0]) + 1, d[1])
+                show = show.parent
+                dds = show.findAll('dd')
+                if len(dds) > 1:
+                    result = [ ]
+                    for dd in dds:
+                        result.append(self.parse_40(date, dd))
+                    shows.append(result)
+                else:
+                    shows.append(self.parse_40(date, show.dd))
+        return shows
+
+    def parse_40(self, date, show):
+        rc = self.cleanText(show)        
+        tL = show.findAll('a')
+        ticketsLink = ''
+        if self.search('ticket', rc):
+            print 'ticket'
+            for l in tL:
+                if l.renderContents() != 'Website':
+                    ticketsLink = l['href']
+                    break
+        time = self.search('\d+pm(\sand\s\d+pm)?', rc)
+        price = self.search('\$\d+', rc) or 'Free'
+        band = self.search('(?<=\s-\s).*', rc.replace(date, '')).split(', with')[0]
+        return [40, date, time, price, False, band, ticketsLink or None]
+
     # 48
     # Cafe Racer
         
@@ -1277,9 +1422,9 @@ class venue(base):
         return conv[min(conv.keys())].strip()
       
     def parseDate(self, month, day):
-        day = str(day)
-        if len(day) == 1:
-            day = '0' + day
+        month, day = str(month), str(day)
+        month = '0' + month if len(month) == 1 else month
+        day = '0' + day if len(day) == 1 else day
         return month+day
 
     def rid(self, phrase):
@@ -1296,366 +1441,14 @@ class venue(base):
             if p.lower() in ['sunday', 'saturday', 'friday', 'thursday', 'wednesday', 'tuesday', 'monday', 'special event', 'special guest', 'surprise guest'] or p == '':
                tR.append(p)
         for p in tR:
+	csrfTOKEN = '{{ csrf_token }}';
             phrase.remove(p)
 
         for i, n in enumerate(phrase):
             phrase[i] = n.strip()
         return phrase    
 
-    def scrapeBlog_TIG(self, band):
-        band = band.lower()
-        br = self.freeBrowser()
-        br.open('http://www.threeimaginarygirls.com/')
-        br.select_form(nr=0)
-        br.form['q'] = band
-        searchPage = br.submit().read()
-        soup = BeautifulSoup(searchPage)
-        link = soup.findAll(attrs={'class': 'gs-title'})
-        print link
-        print br.title()
-        soup = BeautifulSoup(br.follow_link(nr = 0))
-        soup.prettify()
-        print soup
-
-   
-    def scrapeVenue_crocodile(self, date):
-        result = []
-        bands = []
-        dayInt = 0
-        day = date[2:4]
-        month = date[0:2]
-        if date[4:6]:
-            year = '20' + date[4:6]
-        br = self.freeBrowser()
-        soup = BeautifulSoup(br.open('http://thecrocodile.com/index.html?page=calendar&month=' + thisYear + month).read())
-        calendar = soup.find('div', attrs={'id' : 'fullCalendar'})
-        counter = 0
-        for li in calendar('li'):
-            try: 
-                li['class']
-            except:
-                counter += 1
-            if counter == int(day) and li.a:
-                result.append(month + day + year)
-                soup = BeautifulSoup(br.follow_link(url = li.a['href']).read())
-                heading = str(soup.find('h3'))
-                print heading
-                heading = heading.replace('<h3>', '').replace('</h3>', '')
-                heading = self.rid(heading)
-                bands = re.findall(r'[\w\s]+', heading )
-                
-                for i,n in enumerate(bands):
-                        bands[i] = n.strip()
-                notes = soup.find('p')
-                notes = str(notes)
-                notes = notes.replace('\n', '')
-                notes = notes.replace(' ', '')
-                notes = notes.split('<br/>')
-                
-                time = notes[0]
-                time = time.replace('<p>', '')
-                time = time.replace('doors', '')
-                result.append(time)
-                is21 = notes[0]
-                if '21' in is21:
-                    result.append(True)
-                else:
-                    result.append(False)
-                result.append(bands)
-                break
-            else:
-                pass
-        return result
-            
-
-    #pre: pass in the date in mmddyy fashion and just the first name of the venue. i.e. moore and not moore theater. Both Streeengs plz &^)
-    #post: returns a list of show details    
-    def scrapeVenue_STG(self, br, date = None, venue = None, action='scrape', soup = None, month = None):
-        if action == 'open':
-            URL = 'http://stgpresents.org/calendar/calendar.asp?venue=' + { 'moore': 'moore', 'neptune': 'neptune', 'paramount': 'pmt' }[venue]
-            return BeautifulSoup(br.open(URL + '&month=' + month + '&year=' + str(NOW[0])).read())
-        else:
-            month = date[0:2]
-            if month[0] == '0':
-                month = month[1]
-            day = date[2:4]
-            if day[0] == '0':
-                day = day[1]
-            result = []
-            bands = []
-            test = ''
-            hasBreak = '<br'
-            shows = soup.findAll('td', attrs={'class': 'calendar-day'})
-            for show in shows:
-                if show.p.renderContents() == day:
-                    result.append(date)
-                    findTime = show.findAll('span', attrs={'class': 'venue' + venue.capitalize()})
-                    if len(findTime) > 1:
-                        time = findTime[len(findTime) - 1]
-                    elif len(findTime) == 0:
-                        return []
-                    else:
-                        time = findTime[0]
-                    result.append(time.renderContents())
-                    findShow = show.findAll('a', attrs={'class': 'venue' + venue.capitalize()})
-                    if len(findShow) > 1:
-                        goToShow = findShow[len(findShow) - 1]
-                    else:
-                        goToShow = findShow[0]
-                    if not re.search(r'free.*tour', goToShow.renderContents(), re.I) and not re.search(r'special event', goToShow.renderContents(), re.I):
-                        bands.append(goToShow.renderContents())
-                        #go to next page to find 21+ & price
-                        linkText = goToShow.renderContents()
-                        if linkText.find('&amp;'):
-                            linkText = linkText[:linkText.find('&amp;')]
-                        soup = BeautifulSoup(br.follow_link(text_regex = linkText).read())
-                        guests = soup.find(attrs={'id': 'aGuest'})
-                        if guests:
-                            guests = self.rid(guests.renderContents().replace('<br>', '').replace('\n', ''))
-                        if guests: bands += guests
-                        #do price
-                        price = soup.find(attrs={'class' : 'aPrice'})
-                        parsedPrice = [ ] 
-                        if price:
-                            price = price.renderContents()
-                            dict = None
-                            priceItems = re.findall(r'\$[/\$\w\s]+', price)
-                            for i,x in enumerate(priceItems):
-                                y = re.findall('\$[\w\s]+', x)
-                                if len(y) > 1: # if two prices in one line nigguh
-                                    yjoined = ''.join(y)
-                                    if yjoined.find('UW') != -1: UW = True
-                                    else: UW = False
-                                    if UW:
-                                        ints = re.findall('\d+', yjoined)
-                                        for intInd, intN in enumerate(ints):
-                                            ints[intInd] = int(intN)
-                                        minPrice = min(ints)
-                                        maxPrice = max(ints)
-                                        parsedPrice.append('$%s%s(UW)' % (str(maxPrice), str(minPrice)))
-                                        if re.search('advance', yjoined):
-                                            parsedPrice.append('ADV')
-                                        if re.search('day of', yjoined):
-                                            parsedPrice.append('DAYOF')
-                                elif len(y) == 1:
-                                    parsedPrice.append(re.search(r'\$\w+', y[0]).group(0))
-                                    if re.search('advance', x, re.I):
-                                        parsedPrice[i] += 'ADV'
-                                    if re.search('uw student', x, re.I):
-                                        parsedPrice[i] += '(UW)'
-                                    if re.search('day of show', x, re.I):
-                                        parsedPrice[i] += 'DAYOF'
-                            result.append(''.join(parsedPrice))
-                        else:
-                            result.append("Free")
-                            pass
-                        #do 21+
-                        age = soup.find(attrs={'class' : 'aNotes'})
-                        if age != None:
-                            age = age.renderContents()
-                            if  '21' in age:
-                                result.append(True)
-                            else:
-                                result.append(False)
-                        else:
-                            result.append(False)
-                            pass
-                        br.back()
-                        result.append(bands)
-                    else:
-                        result = []
-                else:
-                    pass
-            return result
-    
-     
-    def Comet_Tavern(self, date):
-        br = self.freeBrowser()
-        br.open('http://www.comettavern.com/shows.php')
-        br.select_form(nr=0)
-        month = months[int(date[0:2]) - 1]
-        day = ' %s ' % date[2:4]
-        br['month'] = [month]
-        results = br.submit(name='submit').read()
-        soup = BeautifulSoup(results)
-        show = []
-        found = False
-        for main in soup(id='main'):
-            for link in main('a'):
-                if day in str(link.renderContents()):
-                    try:
-                        entry = br.follow_link(text=link.renderContents(), nr=0).read()
-                        found = True
-                    except:
-                        pass
-        if found == False:  
-            show = []
-        else:
-            bands = []
-            entry = BeautifulSoup(entry)
-            for main in entry(id='main'):
-                for band in main('li'):
-                    bandname = band.renderContents()
-                    for a in band('a'):
-                        bandname = a.renderContents()
-                    bands.append(bandname)
-            for extrainfo in entry('center'):
-                for font in extrainfo('font'):
-                    for b in font('b'):
-                        if '$' in b.renderContents():
-                            extra = b.renderContents()
-                            time = extra[0 : extra.index(' ')]
-                            price = extra[extra.index('$') : len(extra)]
-
-
-            show = ['1', '%s %s' % (month, day[0:3]), time, price, 'True']              
-            for band in bands:
-                show.append(band)
-        return show
-
-    def Neumos_Scrape_Upcoming(self):
-        br = self.freeBrowser()
-        soup = br.open('http://neumos.com/neumos.php').read()
-        soup = BeautifulSoup(soup)
-        show = []
-        
-
-        events = soup.findAll('p', attrs={ 'class' : 'ShowParagraph' })
-        for event in events:
-            writtendate = event.span.renderContents()
-            writtendate = writtendate[writtendate.index('.')+1:]
-            month = writtendate[0:writtendate.index('.')]
-            writtendate = writtendate[writtendate.index('.')+1:]
-            day = writtendate[0:writtendate.index('.')]
-            date = '%s %s' % (months[int(monthsabbr.index(month))], day)
-            bands = []
-            booze = None
-            soldout = event.findAll('span', attrs={ 'class' : 'ShowAlert' })
-            otherbands = event.findAll('a', attrs={ 'title' : 'Click for info' } )
-            for band in otherbands:
-                bands.append(band.renderContents())
-            bands = bands[1:] # cut out the first occurrence of the inevitably doubled headliner, less code than other methods
-            text = event.find('span', attrs={ 'class' : 'description' })
-            desc = text.renderContents()
-            
-            if not soldout:
-                try:
-                    price = desc[desc.index('$'):]
-                    price = price[:price.index(' ')]
-                except:
-                    pricefree = desc[desc.index('FREE'):]
-                    if pricefree:
-                        price = 'Free'
-            else:
-                price = 'Sold out'
-
-            time = desc.index('Doors at')
-            time = desc[time + 9:]
-            time = time[:time.index(' ')]
-
-            try:
-                booze = desc.index('21+')
-            except:
-                pass
-
-            if booze:
-                booze = 'True'
-            else:
-                booze = 'False'
-            
-            show = ['2', date, time, price, booze]
-            for band in bands:
-                show.append(band)
-
-            return show
-
-    def scrapeVenue_neumos(self, date):
-        br = self.freeBrowser()
-        bandList = []
-        monthgiven = months[int(date[0:2]) - 1]
-        soup = BeautifulSoup(br.open('http://neumos.com/neumoscalendar.php?month_offset=').read())
-        month = str(soup.findAll('th', attrs={ 'class' : 'CalendarMonth' })[0].renderContents())
-        month = month[:month.index(' ')]
-        if month != monthgiven:
-            while True:
-                month = str(soup.findAll('th', attrs={ 'class' : 'CalendarMonth' })[0].renderContents())
-                month = month[:month.index(' ')]
-                if month != monthgiven:
-                    soup = BeautifulSoup(br.follow_link(text_regex='next month').read())
-                else:
-                    break
-        calendar = soup.findAll('table')[1]
-        date_entries = calendar.findAll('td')
-        for entry in date_entries:
-            if date[2:4] in entry.renderContents()[0:5]:
-                break
-        try:
-            target = ' '.join(str(entry.a.div.renderContents()).split())
-            soup = BeautifulSoup(br.follow_link(text=target).read())
-            shows = soup.findAll('p', attrs={ 'class' : 'ShowParagraph' })
-            temp = []
-            showdates = []
-            for show in shows:
-                writtendate = show.span.renderContents()
-                writtendate = writtendate[writtendate.index('.')+1:]
-                writtendate = writtendate[writtendate.index('.')+1:]
-                day = writtendate[0:writtendate.index('.')][0:2]
-                if day != date[2:4]:
-                    break
-                temp.append(show)
-            shows = temp
-            for event in shows:
-                writtendate = event.span.renderContents()
-                writtendate = writtendate[writtendate.index('.')+1:]
-                month = writtendate[0:writtendate.index('.')]
-                writtendate = writtendate[writtendate.index('.')+1:]
-                day = writtendate[0:writtendate.index('.')]
-                date = '%s %s' % (months[int(monthsabbr.index(month))], day)
-                bands = []
-                booze = None
-                soldout = event.findAll('span', attrs={ 'class' : 'ShowAlert' })
-                otherbands = event.findAll('a', attrs={ 'title' : 'Click for info' } )
-                for band in otherbands:
-                    bands.append(band.renderContents())
-                bands = bands[1:] # cut out the first occurrence of the inevitably doubled headliner, less code than other methods
-                text = event.find('span', attrs={ 'class' : 'description' })
-                desc = text.renderContents()
-                
-                if not soldout:
-                    try:
-                        price = desc[desc.index('$'):]
-                        price = price[:price.index(' ')]
-                    except:
-                        pricefree = desc[desc.index('FREE'):]
-                        if pricefree:
-                            price = 'Free'
-                else:
-                    price = 'Sold out'
-
-                time = desc.index('Doors at')
-                time = desc[time + 9:]
-                time = time[:time.index(' ')]
-
-                try:
-                    booze = desc.index('21+')
-                except:
-                    pass
-
-                if booze:
-                    booze = 'True'
-                else:
-                    booze = 'False'
-                
-                show = ['2', date, time, price, booze]
-                for band in bands:
-                    bandList.append(band)
-                show.append(bandList)
-                return show
-        except:
-                return 'No show that day.'
-
-
-
+          
     def scrapeVenue_jazzAlley(self, date):
         result = []
         band = []
@@ -1682,51 +1475,21 @@ class venue(base):
         print header
 
 
-
-    def Stranger_Music_Listings(self):    # For cross-referencing, supplementing information
-        br = self.freeBrowser()
-        br.open('http://www.thestranger.com/seattle/Music')
-        listings = br.follow_link(text='Music Listings').read()
-        listings = BeautifulSoup(listings)
-        events = listings.findAll('div', attrs={ 'class' : 'EventListing clearfix' })
-        for event in events:
-            price = event.find('p')
-            try:
-                print price.find('strong').renderContents()
-            except:
-                pass
-        pass
-
-
-
-
-    # Reach-out functions
-
-
-    def email(self, To, Subject, Body):    # For emailing critical errors / progress reports
+class twitter(base):
     
-        import smtplib
-        from email.MIMEMultipart import MIMEMultipart
-        from email.MIMEText import MIMEText
-        from email.MIMEBase import MIMEBase
-        from email.Utils import COMMASPACE, formatdate
-        To = [To]
-        From = 'scapebot'
-        smtpPass = open('smtppass.txt').readline()[0:9]
-        assert type(To) == list
-        Msg = MIMEMultipart()
-        Msg['From'] = From
-        Msg['To'] = COMMASPACE.join(To)
-        Msg['Subject'] = Subject
-        Msg.attach(MIMEText(Body))
-
-        server = smtplib.SMTP('smtp.gmail.com', '587')
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.login('artur.sapek', 'chaney15adick')
-        server.sendmail(From, To, Msg.as_string())
-        server.quit()
+    def random(self, type):
+        regexes = {'exclaim': [r'&gt;\s(?P<r>.*\!)', r'\w[\w\d\s\?\.\,\'\-]+\!'], 'ask': [r'&gt;\s(?P<r>.*\?)', r'\w[\w\d\s\!\.\,\'\-]+\?'], 
+                   'personal': [r'&gt;\s(?P<r>.*(\sme\s|I\s|\smy\s).*)', r'.*']}[type]
+        br = self.freeBrowser()
+        soup = BeautifulSoup(br.open('http://bash.org/?random').read())
+        lines = soup.findAll('p', text=re.compile(regexes[0]))
+        lines = [l.replace('&quot;', '"') for l in lines]
+        goodlines = [ ]
+        for l in lines:
+            r = re.search(regexes[1], l, re.I)
+            if r:
+                goodlines.append(string.capwords(r.group(0)))
+        return [re.search('(?<=(gt;\s|lt;\s)).*', x).group(0) for x in filter(lambda x: re.search('(?<=(gt;\s|lt;\s)).*', x), goodlines)]
 
     def twitter(self, action):    # Fun shit
         br = self.freeBrowser()
@@ -1765,174 +1528,6 @@ class venue(base):
                 returnTweets.append(tweetContents)
             return returnTweets 
         
-        if action[0] == 'trending':
-            trending = soup.find('div', attrs={'class': 'search-trends'}).findAll('a')
-            links = [ ]
-            for a in trending:
-                links.append(a)
-            chosen = choice(links)
-            soup = BeautifulSoup(br.follow_link(url=chosen['href']).read())
-            tweets = soup.findAll('div', attrs={'class' : 'list-tweet'} )
-            returnTweets = [ ]
-            for tweet in tweets:
-                sender = tweet.find('strong').a.renderContents()
-                message = tweet.find('span', attrs={ 'class' : 'status' } ).renderContents()
-                message_soup = BeautifulSoup(message)
-                for tag in message_soup.findAll(True):
-                    if tag.name == 'a':
-                        hashtag = '%s' % tag.renderContents()
-                        tag.replaceWith(hashtag)
-                message = message_soup.renderContents()
-                tweetContents = message
-                returnTweets.append(tweetContents)
-
-
-            
-            soup = BeautifulSoup(' '.join(re.findall('\w+', ' '.join(returnTweets))))
-            for tag in soup(True):
-                tag.replaceWith(tag.renderContents())
-            words = [ ]
-            for i in range(0, 10):
-                word = choice(soup.renderContents().split(' ')).strip()
-                if word != 'RT' and word.find('@') == -1 and len(word) > 3 and word.find(chosen.renderContents().replace('#','')) == -1 and word != ' ': 
-                    words.append(word.replace(',', ''))
-            words += ['420', 'weed', 'bieber']
-            chosenToSearch = choice(words)
-
-            soup = BeautifulSoup(' '.join(re.findall('\w+', ' '.join(self.twitter(['search', chosenToSearch])))))
-            for tag in soup(True):
-                tag.replaceWith(tag.renderContents())
-            words = [ ]
-            for i in range(0, choice([3, 4])):
-                word = choice(soup.renderContents().split(' ')).strip()
-                if word != 'RT' and word.find('@') == -1 and len(word) > 3 and word.find(chosen.renderContents().replace('#','')) == -1 and word != ' ': 
-                    words.append(word.replace(',', ''))
-
-
-            final = '#'
-            for i, n in enumerate(words): 
-                final += string.capitalize(n)
-            return final
-
-
-
-    def randomWordFromTrending(self):
-        pass
-
-
     def tweet(self, tweet):
         self.twitter(['tweet', tweet])
-
-
-    def removeNewlines(self, x):
-        for i,n in enumerate(x):
-            x[i] = n.replace('\n', '')
-        return x
-
-
-    def generateTweet(self):
-        tweet = ''
-        greetingsFile = open('greetings.txt', 'rb')
-        greetings = self.removeNewlines(greetingsFile.readlines())
-        commentaryFile = open('commentary.txt', 'rb')
-        commentary = self.removeNewlines(commentaryFile.readlines())
-        print choice(greetings)
-        print choice(commentary)
-        
-        return tweet
-
-
-    def randomSentence(self, band='Wilco'):
-        words = ['is', 'are', 'were', 'was']
-        word = choice(words)
-        br = self.freeBrowser()
-        soup = br.open('http://en.wikipedia.org/wiki/Special:Random').read()
-        sentences = re.findall(r'[\w\s]+\s%s\s.*' % word, soup)[:-1]
-        if sentences: 
-            sentence = choice(sentences)
-            if sentence[sentence.find(' %s ' % word):sentence.find('.')].find('mandatory') == -1:
-                sentence = band + sentence[sentence.find(' %s ' % word):sentence.find('.')]
-                sentence = ' '.join(sentence.split()[0:len(sentence.split())-int(random()*2)])
-                if sentence.find('<') > -1:
-                    sentence = sentence[:sentence.find('<')]
-                if len(sentence) > 12:
-                    return sentence
-                else:
-                    self.randomSentence(band)
-            else:
-                self.randomSentence(band)
-        else:
-            self.randomSentence(band)
-
-    
-
-    def scrapeVenue_fullMonth(self, venue, month):
-        br = self.freeBrowser()
-        scrapingFuncs = { 1: self.scrapeVenue_neumos, 6: self.scrapeVenue_STG, 7: self.scrapeVenue_STG, 12: self.scrapeVenue_STG,  26: self.scrapeVenue_jazzAlley, 10: self.scrapeVenue_crocodile }
-        STG = { 6: 'paramount', 7: 'moore', 12: 'neptune' }
-        daysMos = { '01': 31, '02': 29, '03': 31, '04': 30, '05': 31, '06': 30, '07': 31, '08': 31, '09': 30, '10': 31, '11': 30, '12': 31 }
-        shows = [ ]
-        soup = scrapingFuncs[venue](br, venue=STG[venue] if venue in STG else venue, action='open', month=month)
-        for i in range(1, daysMos[month]):
-            date = self.parseDate(month, i)
-            show = scrapingFuncs[venue](br, date=date, soup=soup, venue=STG[venue] if venue in STG else venue)
-            if show:
-                    shows.append(show)
-        print shows
-        self.addShows(shows, venue) # chain into the next part which adds em
-
-    def addShows(self, shows, venue):
-        for index, show in enumerate(shows):
-            # first check to see if we already have it
-            alreadyHaveit = Show.objects.filter(venue=venue, date=show[0])
-            if not alreadyHaveit:
-                appendedInfo = ''
-                bands = show[4]
-                newBands = []
-                for i, b in enumerate(bands):
-                    found = False
-                    iterations = self.rBQueries(b)
-                    for y, x in enumerate(iterations): # first check all iterations to see if they be chillin in our DB
-                        s = searchDB = Band.objects.filter(bandname=x)
-                        if len(searchDB) == 1: # if we've found ONE match for the name
-                            newBands.append(searchDB[0].id) # replace that bandname with the ID it has in our DB
-                            found = True
-                            if y > 0:
-                                appendedInfo += '%s:%s' % (str(y), iterations[0].replace(s[0],'')) # add the extra info to the show so we can display it with the artist :)
-                            break
-                    if not found:
-                        for y, x in enumerate(iterations): # when we haven't found it we fucking scrape it
-                            print x
-                            s = scrapeIt = self.researchBand(x)
-                            if scrapeIt:
-                                searchDB = Band.objects.filter(bandname=scrapeIt[0])
-                                if len(searchDB) == 1:
-                                    newBands.append(searchDB[0].id) # replace that bandname with the ID it has in our DB
-                                    found = True
-                                    if y > 0:
-                                        appendedInfo += '%s:%s' % (str(y), iterations[0].replace(s[0],'')) # add the extra info to the show so we can display it with the artist :)
-                                    break
-                                else:
-                                    newBand = Band(bandname=s[0], genre=s[1], origin=s[2])
-                                    newBand.save()
-                                    newBands.append(newBand.id)
-                                    if y > 0:
-                                        appendedInfo += '%s:%s' % (str(y), iterations[0].replace(s[0],'')) # add the extra info to the show so we can display it with the artist :)
-                                    found = True
-                                    break
-                if newBands: # if we found any or all bands (usually it was all or none)
-                    for FUCK, YOU in enumerate(newBands):
-                        newBands[FUCK] = str(YOU)
-                    newShow = Show(venue = venue, date=show[0]+'12', time=show[1], price=show[2], twentyone=show[3], bands=','.join(newBands), bandnameow=appendedInfo if appendedInfo else '')
-                    newShow.save()
-                    print newShow
-
-    def rBQueries(self, query):
-        queries = [ query ]
-        for x in [' with ', ' & ', ' and ', ' - ', ': ']:
-            find = query.find(x)
-            if find > -1:
-                queries.append(query[:find].strip())
-        return queries
-     
 
