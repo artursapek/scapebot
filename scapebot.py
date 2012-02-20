@@ -1374,24 +1374,15 @@ class venue(base):
     def scv_48(self, date, br):      # So since Racer uses AJAX to change the month on their calendar we're gonna give them special treatment and call admin-ajax.php to get the data directly
         m, d = self.splitDate(date)  # because our poor little mechanize Browser doesn't do JS. This actually takes less time/code which is nice. Maybe we should try this method with other websites.
 
-        
     def scv_M_48(self, month, br):
         soup = self.ajax_48(month)
         events = soup.findAll(attrs={'class': 'gce-tooltip-feed-1'}, text=re.compile(r'.*MUSIC:.*'))
         print events
 
-
-
     def ajax_48(self, m):
         return BeautifulSoup(urllib2.urlopen(
             'http://caferacerseattle.com/wp-admin/admin-ajax.php?action=gce_ajax&gce_type=page&gce_feed_ids=1&gce_title_text=&gce_widget_id=gce-page-grid-1&gce_max_events=0&gce_month=%s&gce_year=2012' % m
         ).read())
-
-    
-
-
-
-
 
     def splitDate(self, date):
         return str(int(date[0:2])), str(int(date[2:4]))
@@ -1426,56 +1417,9 @@ class venue(base):
         month = '0' + month if len(month) == 1 else month
         day = '0' + day if len(day) == 1 else day
         return month+day
+       
 
-    def rid(self, phrase):
-        orig = phrase
-        for word in ['and', 'with', '&', ',', '<br>', '<br />', ' - ', ';', '\n']:
-            while phrase.find(word) != -1:
-                phrase = phrase.replace(word, 'xxxxx')
-        if ':' in phrase:
-            phrase = phrase.split(':')
-            phrase = phrase[1]
-        phrase = phrase.split('xxxxx')
-        tR = []
-        for i, p in enumerate(phrase):
-            if p.lower() in ['sunday', 'saturday', 'friday', 'thursday', 'wednesday', 'tuesday', 'monday', 'special event', 'special guest', 'surprise guest'] or p == '':
-               tR.append(p)
-        for p in tR:
-	csrfTOKEN = '{{ csrf_token }}';
-            phrase.remove(p)
-
-        for i, n in enumerate(phrase):
-            phrase[i] = n.strip()
-        return phrase    
-
-          
-    def scrapeVenue_jazzAlley(self, date):
-        result = []
-        band = []
-        result.append(date)
-        br = self.freeBrowser()
-        soup = BeautifulSoup(br.open('http://www.jazzalley.com/calendar.asp').read())
-        weeks = soup.findAll('table', attrs={'height': '60', 'border': '0', 'cellspacing': '4', 'cellpadding': '2'})
-        for week in weeks:
-            days = week.findAll('td', attrs={'bgcolor': '#9f7800'})
-            showinfo = week.findAll('td')[8]
-            for entry in days:
-                day = entry.find('font', attrs={'size': '2'}).renderContents().replace('<b>','').replace('<br />', '').replace('</b>', '').strip()
-                month = entry.findAll('font', attrs={'size':'1'})[2].renderContents().replace('</b>', '').strip()
-                month = str(['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].index(month) + 1)
-                if len(month) == 1:
-                    month = '0' + month
-                if len(day) == 1:
-                    day = '0' + day
-                if month + day == date[0:4]:
-                    URL = showinfo.a['href']
-                    break
-        soup = BeautifulSoup(br.open(URL).read())
-        header = soup.findAll('span', attrs={'class': 'columnHeader'})[1].renderContents()
-        print header
-
-
-class twitter(base):
+   class twitter(base):
     
     def random(self, type):
         regexes = {'exclaim': [r'&gt;\s(?P<r>.*\!)', r'\w[\w\d\s\?\.\,\'\-]+\!'], 'ask': [r'&gt;\s(?P<r>.*\?)', r'\w[\w\d\s\!\.\,\'\-]+\?'], 
