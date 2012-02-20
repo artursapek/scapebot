@@ -1,6 +1,6 @@
 # scapebot
 
-scapebot is a web crawler dedicated to researching musicians and bands that come through Seattle.
+scapebot is a web crawler dedicated to researching musicians and bands.
 I am also building functions to scrape venues' websites for show information.
 
 required libraries: mechanize, BeautifulSoup
